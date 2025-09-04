@@ -1,14 +1,1 @@
-import { Routes, Route } from "react-router-dom";
-import DoctorsList from "./routes/DoctorsList";
-
-function App() {
-  return (
-    <div>
-      <Routes>
-        <Route path="/" element={<DoctorsList />} />
-      </Routes>
-    </div>
-  );
-}
-
-export default App;
+import { Routes, Route } from "react-router-dom";import Home from "./routes/Home";import Login from "./routes/Login";import Signup from "./routes/Signup";import DoctorsList from "./routes/DoctorsList";export default function App(){return(<Routes><Route path="/" element={<Login/>}/><Route path="/signup" element={<Signup/>}/><Route path="/home" element={<Home/>}/><Route path="/doctors" element={<DoctorsList/>}/></Routes>);}
