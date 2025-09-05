@@ -11,13 +11,20 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const formData = new URLSearchParams();
+    formData.append("username", form.email);  // key is 'username' because backend expects OAuth2PasswordRequestForm
+    formData.append("password", form.password);
+
     try {
       const res = await fetch(`${API_BASE_URL}/auth/hospital/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(form),
+        body: formData.toString(),
       });
+
       const data = await res.json();
+
       if (res.ok) {
         localStorage.setItem("hospitalToken", data.access_token);
         localStorage.setItem("hospitalId", data.hospital_id);
@@ -25,7 +32,7 @@ function Login() {
       } else {
         setMsg(data.detail || "Login failed");
       }
-    } catch (err) {
+    } catch {
       setMsg("Server error");
     }
   };
