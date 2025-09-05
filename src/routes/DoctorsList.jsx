@@ -1,1 +1,0 @@
-export default function DoctorsList(){return(<div><h2>Doctors List</h2></div>);}
