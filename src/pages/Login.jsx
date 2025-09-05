@@ -13,7 +13,7 @@ function Login() {
     e.preventDefault();
 
     const formData = new URLSearchParams();
-    formData.append("username", form.email);  // key is 'username' because backend expects OAuth2PasswordRequestForm
+    formData.append("username", form.email);
     formData.append("password", form.password);
 
     try {
@@ -37,15 +37,110 @@ function Login() {
     }
   };
 
+  // Inline style objects
+  const styles = {
+    container: {
+      minHeight: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "linear-gradient(135deg, #4b6cb7, #182848)",
+      padding: 20,
+      boxSizing: "border-box",
+    },
+    box: {
+      background: "white",
+      padding: "40px 30px",
+      borderRadius: 10,
+      boxShadow: "0 8px 20px rgba(0, 0, 0, 0.2)",
+      width: "100%",
+      maxWidth: 400,
+      boxSizing: "border-box",
+      textAlign: "center",
+    },
+    title: {
+      marginBottom: 30,
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      fontSize: 28,
+      color: "#2c3e50",
+      fontWeight: 700,
+    },
+    form: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 20,
+    },
+    input: {
+      padding: "12px 15px",
+      borderRadius: 6,
+      border: "1.5px solid #ccc",
+      fontSize: 16,
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      outline: "none",
+      transition: "border-color 0.3s ease",
+    },
+    button: {
+      backgroundColor: "#4b6cb7",
+      color: "white",
+      fontSize: 18,
+      padding: "12px 0",
+      border: "none",
+      borderRadius: 6,
+      cursor: "pointer",
+      fontWeight: 600,
+      transition: "background-color 0.3s ease",
+    },
+    msg: {
+      marginTop: 20,
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      color: "#e74c3c",
+      fontWeight: 600,
+    },
+  };
+
   return (
-    <div className="container">
-      <h2>Hospital Login</h2>
-      <form onSubmit={handleSubmit}>
-        <input type="email" name="email" placeholder="Email" onChange={handleChange} required /><br /><br />
-        <input type="password" name="password" placeholder="Password" onChange={handleChange} required /><br /><br />
-        <button type="submit">Login</button>
-      </form>
-      {msg && <p>{msg}</p>}
+    <div style={styles.container}>
+      <div style={styles.box}>
+        <h2 style={styles.title}>Hospital Portal Login</h2>
+        <form
+          style={styles.form}
+          onSubmit={handleSubmit}
+          onFocus={(e) => {
+            if (e.target.tagName === "INPUT") e.target.style.borderColor = "#4b6cb7";
+          }}
+          onBlur={(e) => {
+            if (e.target.tagName === "INPUT") e.target.style.borderColor = "#ccc";
+          }}
+        >
+          <input
+            style={styles.input}
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            required
+          />
+          <input
+            style={styles.input}
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            required
+          />
+          <button
+            type="submit"
+            style={styles.button}
+            onMouseOver={e => (e.currentTarget.style.backgroundColor = "#3a539b")}
+            onMouseOut={e => (e.currentTarget.style.backgroundColor = "#4b6cb7")}
+          >
+            Login
+          </button>
+        </form>
+        {msg && <p style={styles.msg}>{msg}</p>}
+      </div>
     </div>
   );
 }
