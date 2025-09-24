@@ -1,4 +1,3 @@
-// src/components/Navbar.jsx
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -7,11 +6,13 @@ export default function Navbar() {
 
   const token = localStorage.getItem("hospitalToken");
   const hospitalName = localStorage.getItem("hospitalName");
+  const hospitalEmail = localStorage.getItem("hospitalEmail");
 
   const handleLogout = () => {
     localStorage.removeItem("hospitalToken");
     localStorage.removeItem("hospitalId");
     localStorage.removeItem("hospitalName");
+    localStorage.removeItem("hospitalEmail");
     navigate("/");
   };
 
@@ -69,13 +70,12 @@ export default function Navbar() {
               </Link>
             </>
           ) : (
-            // Logged in: show hospital name + logout
+            // Logged in: show hospital name + email + logout
             <>
-              {hospitalName && (
-                <div style={{ color: "white", fontWeight: 600 }}>
-                  {hospitalName}
-                </div>
-              )}
+              <div style={{ color: "white", textAlign: "right" }}>
+                {hospitalName && <div style={{ fontWeight: 700 }}>{hospitalName}</div>}
+                {hospitalEmail && <div style={{ fontSize: 12, opacity: 0.9 }}>{hospitalEmail}</div>}
+              </div>
               <button
                 onClick={handleLogout}
                 style={{

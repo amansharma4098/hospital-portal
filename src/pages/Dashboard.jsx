@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
 import API_BASE_URL from "../config";
 
@@ -21,6 +20,7 @@ function SmallInput({ label, name, value, setValue, type = "text", placeholder =
 export default function Dashboard() {
   const hospitalId = localStorage.getItem("hospitalId");
   const hospitalName = localStorage.getItem("hospitalName");
+  const hospitalEmail = localStorage.getItem("hospitalEmail");
   const token = localStorage.getItem("hospitalToken");
 
   // counts for cards
@@ -149,7 +149,10 @@ export default function Dashboard() {
       <div style={{ flex: 1 }}>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ margin: 0 }}>Hospital Dashboard</h2>
-          <p style={{ color: "#666" }}>Hospital: {hospitalName || `ID: ${hospitalId}`}</p>
+          <p style={{ color: "#666" }}>
+            {hospitalName ? hospitalName : `Hospital ID: ${hospitalId}`}
+            {hospitalEmail && <span style={{ marginLeft: 12, fontSize: 13, color: "#444" }}>{hospitalEmail}</span>}
+          </p>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>

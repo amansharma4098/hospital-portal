@@ -1,4 +1,3 @@
-// src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import API_BASE_URL from "../config";
@@ -30,9 +29,10 @@ function Login() {
         localStorage.setItem("hospitalToken", data.access_token);
         localStorage.setItem("hospitalId", data.hospital_id);
 
-        // try to fetch hospital name (optional)
+        // try to fetch hospital name and email (optional)
         try {
           const token = data.access_token;
+          // try /hospital/me first (common pattern), fallback to /hospital/{id}
           let detailRes = await fetch(`${API_BASE_URL}/hospital/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -44,10 +44,12 @@ function Login() {
           if (detailRes.ok) {
             const detailJson = await detailRes.json();
             const name = detailJson.name || detailJson.hospital?.name || detailJson.hospital_name;
+            const email = detailJson.email || detailJson.hospital?.email || detailJson.hospital_email;
             if (name) localStorage.setItem("hospitalName", name);
+            if (email) localStorage.setItem("hospitalEmail", email);
           }
         } catch (err) {
-          // ignore
+          // ignore fetch errors; rely on signup-stored name/email if any
         }
 
         navigate("/dashboard");
