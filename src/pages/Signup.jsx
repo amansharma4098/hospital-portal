@@ -1,3 +1,4 @@
+// src/pages/Signup.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API_BASE_URL from "../config";
@@ -27,6 +28,13 @@ function Signup() {
       const data = await res.json();
 
       if (res.ok) {
+        // Save hospital name locally so dashboard can show it immediately after signup/login
+        try {
+          localStorage.setItem("hospitalName", form.name);
+        } catch (err) {
+          // ignore storage errors
+        }
+
         setMsg("Hospital registered! Please login.");
         setTimeout(() => navigate("/"), 1500); // redirect after 1.5s delay to show message
       } else {

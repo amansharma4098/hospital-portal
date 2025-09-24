@@ -20,6 +20,7 @@ function SmallInput({ label, name, value, setValue, type = "text", placeholder =
 
 export default function Dashboard() {
   const hospitalId = localStorage.getItem("hospitalId");
+  const hospitalName = localStorage.getItem("hospitalName");
   const token = localStorage.getItem("hospitalToken");
 
   // counts for cards
@@ -135,11 +136,6 @@ export default function Dashboard() {
     }
   }
 
-  async function refreshSingleTicket(id) {
-    // optional: refetch list
-    fetchTickets();
-  }
-
   const cardStyle = {
     background: "white",
     borderRadius: 10,
@@ -153,14 +149,14 @@ export default function Dashboard() {
       <div style={{ flex: 1 }}>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ margin: 0 }}>Hospital Dashboard</h2>
-          <p style={{ color: "#666" }}>Hospital ID: {hospitalId}</p>
+          <p style={{ color: "#666" }}>Hospital: {hospitalName || `ID: ${hospitalId}`}</p>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
           <div style={cardStyle} onClick={() => openCardModal("pros")}>
-            <h3>Get Pros</h3>
+            <h3>Public Relations Officers</h3>
             <p style={{ margin: "8px 0" }}>{counts.pro_count} existing</p>
-            <small>Request professionals (technicians, contractors)</small>
+            <small>Request public relations officers (PR / communications)</small>
           </div>
 
           <div style={cardStyle} onClick={() => openCardModal("staff")}>
@@ -204,7 +200,7 @@ export default function Dashboard() {
               style={{ width: 520, background: "white", padding: 20, borderRadius: 10 }}
             >
               <h3 style={{ marginTop: 0 }}>
-                {openModal === "pros" ? "Request Pros" :
+                {openModal === "pros" ? "Request Public Relations Officers" :
                  openModal === "staff" ? "Request Staff" :
                  openModal === "doctor" ? "Request Doctor" : "Create Request"}
               </h3>

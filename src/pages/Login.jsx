@@ -1,3 +1,4 @@
+// src/pages/Login.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API_BASE_URL from "../config";
@@ -28,6 +29,30 @@ function Login() {
       if (res.ok) {
         localStorage.setItem("hospitalToken", data.access_token);
         localStorage.setItem("hospitalId", data.hospital_id);
+
+        // Try to fetch hospital details (name). If your backend provides a detail route like /hospital/{id} or /hospital/me, adjust accordingly.
+        try {
+          const token = data.access_token;
+          // try /hospital/me first (common pattern), fallback to /hospital/{id}
+          let name;
+          let detailRes = await fetch(`${API_BASE_URL}/hospital/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!detailRes.ok) {
+            detailRes = await fetch(`${API_BASE_URL}/hospital/${data.hospital_id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+          if (detailRes.ok) {
+            const detailJson = await detailRes.json();
+            // common fields: name or hospital.name
+            name = detailJson.name || detailJson.hospital?.name || detailJson.hospital_name;
+            if (name) localStorage.setItem("hospitalName", name);
+          }
+        } catch (err) {
+          // ignore fetch errors; rely on signup-stored name if any
+        }
+
         navigate("/dashboard");
       } else {
         setMsg(data.detail || "Login failed");
