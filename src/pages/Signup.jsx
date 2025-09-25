@@ -23,14 +23,21 @@ function Signup() {
   };
 
   // Fallback login call if signup didn't return a token
+  // Backend expects OAuth2 form (username & password) at /auth/hospital/login
   const attemptLogin = async (email, password) => {
-    const params = new URLSearchParams({ email, password });
-    const res = await fetch(`${API_BASE_URL}/hospital/login?` + params.toString(), {
+    const body = new URLSearchParams();
+    body.append("username", email); // OAuth2PasswordRequestForm expects 'username'
+    body.append("password", password);
+
+    const res = await fetch(`${API_BASE_URL}/auth/hospital/login`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
     });
 
     if (!res.ok) {
-      // Try to surface backend message if present
       const errJson = await res.json().catch(() => ({}));
       throw new Error(errJson.detail || `Login failed (${res.status})`);
     }
@@ -43,22 +50,34 @@ function Signup() {
     setMsg("");
     setLoading(true);
 
-    const params = new URLSearchParams({
-      name: form.name,
-      email: form.email,
-      city: form.city,
-      password: form.password,
-    });
-
     try {
-      const res = await fetch(`${API_BASE_URL}/hospital/register?` + params.toString(), {
+      // Send JSON body to match HospitalRegisterRequest Pydantic model
+      const res = await fetch(`${API_BASE_URL}/hospital/register`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          city: form.city,
+          password: form.password,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setMsg(data.detail || `Signup failed (${res.status})`);
+        // surface validation messages if present (422) or other details
+        if (res.status === 422 && data.detail) {
+          const validationMessages = Array.isArray(data.detail)
+            ? data.detail.map((d) => {
+                const loc = Array.isArray(d.loc) ? d.loc.slice(1).join(".") : d.loc;
+                return `${loc}: ${d.msg}`;
+              }).join(" | ")
+            : data.detail;
+          setMsg(`Validation error: ${validationMessages}`);
+        } else {
+          setMsg(data.detail || `Signup failed (${res.status})`);
+        }
         setLoading(false);
         return;
       }
@@ -71,7 +90,7 @@ function Signup() {
         console.warn("localStorage error:", err);
       }
 
-      // Preferred: backend returned a token with signup response
+      // If signup returned a token, use it
       if (data.token) {
         saveAuth({ token: data.token, name: data.hospital?.name || form.name, email: data.hospital?.email || form.email });
         navigate("/dashboard", { replace: true });
@@ -81,17 +100,17 @@ function Signup() {
       // Fallback: attempt to login immediately using same credentials
       try {
         const loginResp = await attemptLogin(form.email, form.password);
-
-        if (loginResp && loginResp.token) {
+        // backend returns { token: ... } for hospital login in your router
+        const token = loginResp.token || loginResp.access_token || loginResp.data?.token;
+        if (token) {
           saveAuth({
-            token: loginResp.token,
+            token,
             name: loginResp.hospital?.name || form.name,
-            email: loginResp.hospital?.email || form.email,
+            email: form.email,
           });
           navigate("/dashboard", { replace: true });
           return;
         } else {
-          // No token from login response — send user to login page
           setMsg("Registered — please login. (No token returned.)");
           navigate("/login", { replace: true });
         }
