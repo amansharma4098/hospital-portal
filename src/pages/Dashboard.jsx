@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
 import {
   Avatar,
@@ -19,14 +20,28 @@ import {
   Stack,
   TextField,
   Typography,
+  Tooltip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
+import DoneIcon from "@mui/icons-material/Done";
+import CopyAllIcon from "@mui/icons-material/CopyAll";
 import API_BASE_URL from "../config";
 import logo from "../assets/logo.png";
 
 function SmallInput({ label, name, value, setValue, type = "text", placeholder = "" }) {
   return (
-    <TextField label={label} name={name} type={type} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} fullWidth margin="normal" size="small" />
+    <TextField
+      label={label}
+      name={name}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      fullWidth
+      margin="normal"
+      size="small"
+    />
   );
 }
 
@@ -36,16 +51,21 @@ export default function Dashboard() {
   const hospitalEmail = localStorage.getItem("hospitalEmail");
   const token = localStorage.getItem("hospitalToken");
 
-  console.log("Token from localStorage:", token);
-
   const [counts, setCounts] = useState({ staff_count: 0, doctor_count: 0, pro_count: 0, request_count: 0 });
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
-  const [openModal, setOpenModal] = useState(null);
+  const [openModal, setOpenModal] = useState(null); // for create
   const [payloadFields, setPayloadFields] = useState({ count: "", location: "", offered_salary: "", notes: "" });
   const [msg, setMsg] = useState("");
   const [creating, setCreating] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+
+  // edit modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDetails, setEditDetails] = useState("");
+  const [editPayloadText, setEditPayloadText] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -77,12 +97,13 @@ export default function Dashboard() {
   async function fetchTickets() {
     setLoadingTickets(true);
     try {
+      // kept compatibility: hospital/requests returns tickets for hospital (alias to /tickets)
       const res = await fetch(`${API_BASE_URL}/hospital/requests`, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
       });
       if (res.ok) {
         const d = await res.json();
-        setTickets(d);
+        setTickets(Array.isArray(d) ? d : []);
       } else {
         setTickets([]);
       }
@@ -107,12 +128,11 @@ export default function Dashboard() {
     const request_type =
       openModal === "pros" ? "get_pro" : openModal === "staff" ? "get_staff" : openModal === "doctor" ? "get_doctor" : "other_request";
 
-    const payload = {
-      count: payloadFields.count || undefined,
-      location: payloadFields.location || undefined,
-      offered_salary: payloadFields.offered_salary || undefined,
-      notes: payloadFields.notes || undefined,
-    };
+    const payload = {};
+    if (payloadFields.count) payload.count = Number(payloadFields.count);
+    if (payloadFields.location) payload.location = payloadFields.location;
+    if (payloadFields.offered_salary) payload.offered_salary = payloadFields.offered_salary;
+    if (payloadFields.notes) payload.notes = payloadFields.notes;
 
     try {
       setCreating(true);
@@ -129,8 +149,8 @@ export default function Dashboard() {
       if (res.ok) {
         setMsg("Request created successfully!");
         setOpenModal(null);
-        fetchTickets();
-        fetchDashboardCounts();
+        await fetchTickets();
+        await fetchDashboardCounts();
       } else {
         setMsg(data.detail || "Failed to create request");
       }
@@ -140,6 +160,101 @@ export default function Dashboard() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // --- Edit ticket handlers (inline modal) ---
+  function openEditModal(ticket) {
+    setSelectedTicket(ticket);
+    setEditDetails(ticket.details || "");
+    setEditPayloadText(ticket.payload ? JSON.stringify(ticket.payload, null, 2) : "");
+    setEditError("");
+    setEditOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!selectedTicket) return;
+    setEditError("");
+    let payloadObj = null;
+    if (editPayloadText && editPayloadText.trim()) {
+      try {
+        payloadObj = JSON.parse(editPayloadText);
+      } catch (e) {
+        setEditError("Payload must be valid JSON.");
+        return;
+      }
+    }
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/tickets/${selectedTicket.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          details: editDetails,
+          payload: payloadObj,
+          // admin/hospital difference handled on server: hospital token -> last_updated_by_hospital
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Save failed (${res.status})`);
+      }
+      // refresh
+      await fetchTickets();
+      await fetchDashboardCounts();
+      setEditOpen(false);
+      setSelectedTicket(null);
+    } catch (err) {
+      console.error("handleSaveEdit error:", err);
+      setEditError(err.message || "Save failed");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleCloseTicket(ticket) {
+    if (!ticket) return;
+    const ok = window.confirm(`Close ticket #${ticket.id}? This action cannot be undone.`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/tickets/${ticket.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          status: "closed", // hospital closes -> status "closed" (admin may use "resolved")
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Close failed (${res.status})`);
+      }
+      await fetchTickets();
+      await fetchDashboardCounts();
+      setSelectedTicket(null);
+    } catch (err) {
+      console.error("handleCloseTicket error:", err);
+      alert(err.message || "Failed to close ticket");
+    }
+  }
+
+  const copyPayloadToClipboard = async (payload) => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload || {}, null, 2));
+      // optional small feedback
+    } catch (e) {
+      console.error("copy failed", e);
+    }
+  };
+
+  // Helper to render count (hide zeroes)
+  const renderCount = (n) => {
+    if (!n || Number(n) === 0) return "—";
+    return n;
   };
 
   return (
@@ -167,14 +282,18 @@ export default function Dashboard() {
         <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
             <Grid container spacing={2}>
+              {/* Cards: show titles but hide numeric zeros as '—' */}
               <Grid item xs={12} sm={6}>
-                <Card onClick={() => openCardModal("pros")} sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}>
+                <Card
+                  onClick={() => openCardModal("pros")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
                       Public Relations Officers
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      {counts.pro_count}
+                      {renderCount(counts.pro_count)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       Request PR / Communications staff
@@ -184,13 +303,16 @@ export default function Dashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6}>
-                <Card onClick={() => openCardModal("staff")} sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}>
+                <Card
+                  onClick={() => openCardModal("staff")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
                       Staff
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      {counts.staff_count}
+                      {renderCount(counts.staff_count)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       Request permanent/temporary staff
@@ -200,13 +322,16 @@ export default function Dashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6}>
-                <Card onClick={() => openCardModal("doctor")} sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}>
+                <Card
+                  onClick={() => openCardModal("doctor")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
                       Doctors
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      {counts.doctor_count}
+                      {renderCount(counts.doctor_count)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       Request visiting or full-time doctors
@@ -216,13 +341,16 @@ export default function Dashboard() {
               </Grid>
 
               <Grid item xs={12} sm={6}>
-                <Card onClick={() => openCardModal("other")} sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}>
+                <Card
+                  onClick={() => openCardModal("other")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
                       Other Requests
                     </Typography>
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                      {counts.request_count}
+                      {renderCount(counts.request_count)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       Procurement, onboarding and other requests
@@ -252,16 +380,30 @@ export default function Dashboard() {
                     {tickets.map((t) => (
                       <ListItem
                         key={t.id}
-                        button
-                        onClick={() => setSelectedTicket(t)}
                         sx={{
                           borderRadius: 1,
                           my: 0.5,
                           bgcolor: t.status === "open" ? "background.paper" : "grey.50",
+                          display: "flex",
+                          alignItems: "center",
                         }}
+                        secondaryAction={
+                          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                            <Tooltip title="Edit">
+                              <IconButton edge="end" size="small" onClick={() => openEditModal(t)}>
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Close">
+                              <IconButton edge="end" size="small" onClick={() => handleCloseTicket(t)}>
+                                <DoneIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        }
                       >
                         <ListItemText
-                          primary={`${t.request_type} — #${t.id}`}
+                          primary={`${t.type || t.request_type} — #${t.id}`}
                           secondary={
                             <span>
                               {t.payload && Object.keys(t.payload).length
@@ -269,11 +411,11 @@ export default function Dashboard() {
                                     .slice(0, 2)
                                     .map(([k, v]) => `${k}: ${String(v)}`)
                                     .join(" • ")
-                                : "No details"}
+                                : t.details || "No details"}
                             </span>
                           }
                         />
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                           {t.created_at ? new Date(t.created_at).toLocaleString() : ""}
                         </Typography>
                       </ListItem>
@@ -315,8 +457,14 @@ export default function Dashboard() {
                         sx={{ borderRadius: 1, my: 0.5 }}
                       >
                         <ListItemText
-                          primary={`${t.request_type} — #${t.id}`}
-                          secondary={t.payload && Object.keys(t.payload).length ? Object.entries(t.payload).slice(0,1).map(([k,v]) => `${k}: ${String(v)}`) : "No details"}
+                          primary={`${t.type || t.request_type} — #${t.id}`}
+                          secondary={
+                            t.payload && Object.keys(t.payload).length
+                              ? Object.entries(t.payload)
+                                  .slice(0, 1)
+                                  .map(([k, v]) => `${k}: ${String(v)}`)
+                              : t.details || "No details"
+                          }
                         />
                         <Typography variant="caption" color="text.secondary">
                           {t.created_at ? new Date(t.created_at).toLocaleDateString() : ""}
@@ -330,23 +478,41 @@ export default function Dashboard() {
               {selectedTicket && (
                 <Box sx={{ mt: 2 }}>
                   <Paper variant="outlined" sx={{ p: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Ticket #{selectedTicket.id}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {selectedTicket.request_type} • {selectedTicket.status}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          Ticket #{selectedTicket.id}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {selectedTicket.type || selectedTicket.request_type} • {selectedTicket.status}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        <Tooltip title="Edit">
+                          <IconButton size="small" onClick={() => openEditModal(selectedTicket)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Copy payload">
+                          <IconButton size="small" onClick={() => copyPayloadToClipboard(selectedTicket.payload)}>
+                            <CopyAllIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+
                     <Box sx={{ mt: 1, bgcolor: "#fafafa", p: 1, borderRadius: 1 }}>
                       <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
-                        {JSON.stringify(selectedTicket.payload, null, 2)}
+                        {JSON.stringify(selectedTicket.payload || selectedTicket.details || {}, null, 2)}
                       </pre>
                     </Box>
+
                     <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                      <Button size="small" onClick={() => navigator.clipboard.writeText(JSON.stringify(selectedTicket.payload || {}))}>
-                        Copy
-                      </Button>
                       <Button size="small" onClick={() => setSelectedTicket(null)}>
                         Close
+                      </Button>
+                      <Button size="small" color="error" onClick={() => handleCloseTicket(selectedTicket)}>
+                        Close Ticket
                       </Button>
                     </Box>
                   </Paper>
@@ -376,13 +542,42 @@ export default function Dashboard() {
 
         <DialogContent>
           <Box component="form" onSubmit={createTicket}>
-            <SmallInput label="Count" name="count" type="number" value={payloadFields.count} setValue={(v) => setPayloadFields((p) => ({ ...p, count: v }))} placeholder="Number of persons / doctors" />
+            <SmallInput
+              label="Count"
+              name="count"
+              type="number"
+              value={payloadFields.count}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, count: v }))}
+              placeholder="Number of persons / doctors"
+            />
 
-            <SmallInput label="Location" name="location" value={payloadFields.location} setValue={(v) => setPayloadFields((p) => ({ ...p, location: v }))} placeholder="City / area" />
+            <SmallInput
+              label="Location"
+              name="location"
+              value={payloadFields.location}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, location: v }))}
+              placeholder="City / area"
+            />
 
-            <SmallInput label="Offered Salary (optional)" name="offered_salary" value={payloadFields.offered_salary} setValue={(v) => setPayloadFields((p) => ({ ...p, offered_salary: v }))} placeholder="e.g. 15000/month" />
+            <SmallInput
+              label="Offered Salary (optional)"
+              name="offered_salary"
+              value={payloadFields.offered_salary}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, offered_salary: v }))}
+              placeholder="e.g. 15000/month"
+            />
 
-            <TextField label="Notes" name="notes" value={payloadFields.notes} onChange={(e) => setPayloadFields((p) => ({ ...p, notes: e.target.value }))} fullWidth multiline rows={4} margin="normal" size="small" />
+            <TextField
+              label="Notes"
+              name="notes"
+              value={payloadFields.notes}
+              onChange={(e) => setPayloadFields((p) => ({ ...p, notes: e.target.value }))}
+              fullWidth
+              multiline
+              rows={4}
+              margin="normal"
+              size="small"
+            />
 
             {msg && (
               <Typography variant="body2" color="error" sx={{ mt: 1 }}>
@@ -394,6 +589,54 @@ export default function Dashboard() {
               <Button onClick={() => setOpenModal(null)}>Cancel</Button>
               <Button type="submit" variant="contained" disabled={creating}>
                 {creating ? "Creating..." : "Create Request"}
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Ticket Dialog (inline editor) */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>Edit Ticket {selectedTicket ? `#${selectedTicket.id}` : ""}</span>
+          <IconButton size="small" onClick={() => setEditOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent>
+          <Box sx={{ mt: 1 }}>
+            <TextField
+              label="Details"
+              value={editDetails}
+              onChange={(e) => setEditDetails(e.target.value)}
+              fullWidth
+              multiline
+              rows={3}
+              margin="normal"
+            />
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Payload (JSON)
+            </Typography>
+            <TextField
+              value={editPayloadText}
+              onChange={(e) => setEditPayloadText(e.target.value)}
+              fullWidth
+              multiline
+              rows={10}
+              margin="normal"
+              inputProps={{ style: { fontFamily: "monospace", fontSize: 13 } }}
+            />
+            {editError && (
+              <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                {editError}
+              </Typography>
+            )}
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 2 }}>
+              <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button variant="contained" onClick={handleSaveEdit} disabled={editSaving}>
+                {editSaving ? "Saving..." : "Save changes"}
               </Button>
             </Box>
           </Box>
