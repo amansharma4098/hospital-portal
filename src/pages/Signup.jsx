@@ -1,4 +1,3 @@
-// src/components/Signup.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,14 +22,15 @@ export default function Signup() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: "", email: "", city: "", password: "" });
-  const [msg, setMsg] = useState(null); // { type: "error"|"success", text }
+  const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const saveAuth = ({ token, name, email }) => {
+  const saveAuth = ({ token, id, name, email }) => {
     try {
-      if (token) localStorage.setItem("token", token);
+      if (token) localStorage.setItem("hospitalToken", token);
+      if (id) localStorage.setItem("hospitalId", id);
       if (name) localStorage.setItem("hospitalName", name);
       if (email) localStorage.setItem("hospitalEmail", email);
     } catch (err) {
@@ -87,12 +87,10 @@ export default function Signup() {
         return;
       }
 
-      localStorage.setItem("hospitalName", form.name);
-      localStorage.setItem("hospitalEmail", form.email);
-
       if (data.token) {
         saveAuth({
           token: data.token,
+          id: data.hospital?.id,
           name: data.hospital?.name || form.name,
           email: data.hospital?.email || form.email,
         });
@@ -102,10 +100,11 @@ export default function Signup() {
 
       try {
         const loginResp = await attemptLogin(form.email, form.password);
-        const token = loginResp.token || loginResp.access_token || loginResp.data?.token;
+        const token = loginResp.token;
         if (token) {
           saveAuth({
             token,
+            id: loginResp.hospital_id,
             name: loginResp.hospital?.name || form.name,
             email: form.email,
           });
@@ -145,7 +144,7 @@ export default function Signup() {
       <Container maxWidth="lg">
         <Paper elevation={6} sx={{ borderRadius: 3, overflow: "hidden", maxWidth: 980, mx: "auto" }}>
           <Grid container>
-            {/* Left column: logo + info */}
+            {/* Left column */}
             <Grid
               item
               xs={12}
@@ -158,118 +157,40 @@ export default function Signup() {
                 justifyContent: "center",
                 p: { xs: 4, md: 6 },
                 textAlign: "center",
-                borderRight: { md: `1px solid ${theme.palette.divider}` },
               }}
             >
-              <Avatar
-                src={logo}
-                alt="Raksha360"
-                variant="square"
-                sx={{
-                  width: { xs: 180, sm: 200, md: 220 },
-                  height: "auto",
-                  mb: 2,
-                  borderRadius: 1.5,
-                }}
-              />
+              <Avatar src={logo} alt="Raksha360" variant="square" sx={{ width: 200, height: "auto", mb: 2 }} />
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                 Create your Hospital Account
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 260 }}>
                 Join Raksha360 and manage doctors, staff, and hospital resources with ease.
               </Typography>
-
               <Box sx={{ mt: 3, width: "60%", display: { xs: "none", md: "block" } }}>
                 <Divider />
               </Box>
             </Grid>
 
-            {/* Right column: form */}
+            {/* Right column */}
             <Grid item xs={12} md={7} sx={{ p: { xs: 4, sm: 6 } }}>
               <Box sx={{ maxWidth: 480, width: "100%", mx: "auto" }}>
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
                   Hospital Signup
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                  Fill in the details to create your account
-                </Typography>
-
                 {msg && (
                   <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
                     {msg.text}
                   </Alert>
                 )}
-
                 <Box component="form" onSubmit={handleSubmit} noValidate>
-                  <TextField
-                    label="Hospital Name"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    fullWidth
-                    margin="normal"
-                    required
-                  />
-
-                  <TextField
-                    label="Email"
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    fullWidth
-                    margin="normal"
-                    required
-                  />
-
-                  <TextField
-                    label="City"
-                    name="city"
-                    value={form.city}
-                    onChange={handleChange}
-                    fullWidth
-                    margin="normal"
-                    required
-                  />
-
-                  <TextField
-                    label="Password"
-                    name="password"
-                    type="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    fullWidth
-                    margin="normal"
-                    required
-                  />
-
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    sx={{
-                      mt: 2,
-                      py: 1.5,
-                      fontWeight: 700,
-                      letterSpacing: 0.6,
-                      background:
-                        theme.palette.mode === "light"
-                          ? "linear-gradient(90deg,#1976d2,#dc004e)"
-                          : undefined,
-                    }}
-                    disabled={loading}
-                  >
+                  <TextField label="Hospital Name" name="name" value={form.name} onChange={handleChange} fullWidth margin="normal" required />
+                  <TextField label="Email" name="email" type="email" value={form.email} onChange={handleChange} fullWidth margin="normal" required />
+                  <TextField label="City" name="city" value={form.city} onChange={handleChange} fullWidth margin="normal" required />
+                  <TextField label="Password" name="password" type="password" value={form.password} onChange={handleChange} fullWidth margin="normal" required />
+                  <Button type="submit" fullWidth variant="contained" sx={{ mt: 2, py: 1.5, fontWeight: 700 }} disabled={loading}>
                     {loading ? <CircularProgress size={20} color="inherit" /> : "SIGNUP"}
                   </Button>
                 </Box>
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 3, display: "block", textAlign: "center" }}
-                >
-                  By signing up you’ll be redirected to the dashboard automatically if possible.
-                </Typography>
               </Box>
             </Grid>
           </Grid>
