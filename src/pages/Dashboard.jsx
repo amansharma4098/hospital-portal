@@ -1,29 +1,55 @@
+// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Container,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import API_BASE_URL from "../config";
+import logo from "../assets/logo.png";
 
 function SmallInput({ label, name, value, setValue, type = "text", placeholder = "" }) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>{label}</label>
-      <input
-        type={type}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        style={{ padding: "8px 10px", width: "100%", borderRadius: 6, border: "1px solid #ccc" }}
-      />
-    </div>
+    <TextField
+      label={label}
+      name={name}
+      type={type}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      fullWidth
+      margin="normal"
+      size="small"
+    />
   );
 }
 
 export default function Dashboard() {
+  const theme = useTheme();
+
   const hospitalId = localStorage.getItem("hospitalId");
   const hospitalName = localStorage.getItem("hospitalName");
   const hospitalEmail = localStorage.getItem("hospitalEmail");
   const token = localStorage.getItem("hospitalToken");
 
-  // counts for cards
   const [counts, setCounts] = useState({
     staff_count: 0,
     doctor_count: 0,
@@ -31,21 +57,14 @@ export default function Dashboard() {
     request_count: 0,
   });
 
-  // modal state
   const [openModal, setOpenModal] = useState(null); // "pros" | "staff" | "doctor" | "other" | null
-
-  // form values (flexible payload)
   const [payloadFields, setPayloadFields] = useState({ count: "", location: "", offered_salary: "", notes: "" });
 
-  // tickets list
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
-
-  // selected ticket to view details
   const [selectedTicket, setSelectedTicket] = useState(null);
-
-  // messages
   const [msg, setMsg] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetchDashboardCounts();
@@ -95,22 +114,22 @@ export default function Dashboard() {
     setMsg("");
   }
 
-  async function createTicket(e) {
+  const createTicket = async (e) => {
     e.preventDefault();
     if (!openModal) return;
 
-    const request_type = openModal === "pros" ? "get_pro" :
-                         openModal === "staff" ? "get_staff" :
-                         openModal === "doctor" ? "get_doctor" : "other_request";
+    const request_type =
+      openModal === "pros" ? "get_pro" : openModal === "staff" ? "get_staff" : openModal === "doctor" ? "get_doctor" : "other_request";
 
     const payload = {
       count: payloadFields.count || undefined,
       location: payloadFields.location || undefined,
       offered_salary: payloadFields.offered_salary || undefined,
-      notes: payloadFields.notes || undefined
+      notes: payloadFields.notes || undefined,
     };
 
     try {
+      setCreating(true);
       const res = await fetch(`${API_BASE_URL}/hospital/requests`, {
         method: "POST",
         headers: {
@@ -120,11 +139,10 @@ export default function Dashboard() {
         body: JSON.stringify({ request_type, payload }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setMsg("Request created successfully!");
         setOpenModal(null);
-        // refresh
         fetchTickets();
         fetchDashboardCounts();
       } else {
@@ -133,161 +151,313 @@ export default function Dashboard() {
     } catch (err) {
       console.error(err);
       setMsg("Server error");
+    } finally {
+      setCreating(false);
     }
-  }
-
-  const cardStyle = {
-    background: "white",
-    borderRadius: 10,
-    padding: 18,
-    boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-    cursor: "pointer",
   };
 
   return (
-    <div style={{ display: "flex", gap: 20, padding: 20 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: 16 }}>
-          <h2 style={{ margin: 0 }}>Hospital Dashboard</h2>
-          <p style={{ color: "#666" }}>
-            {hospitalName ? hospitalName : `Hospital ID: ${hospitalId}`}
-            {hospitalEmail && <span style={{ marginLeft: 12, fontSize: 13, color: "#444" }}>{hospitalEmail}</span>}
-          </p>
-        </div>
+    <Box sx={{ py: 6, bgcolor: "background.default", minHeight: "100vh" }}>
+      <Container maxWidth="lg">
+        <Paper sx={{ p: 3, borderRadius: 2, mb: 4 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Avatar src={logo} variant="square" sx={{ width: 84, height: 36 }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                {hospitalName || `Hospital ID: ${hospitalId}`}
+              </Typography>
+              {hospitalEmail && (
+                <Typography variant="body2" color="text.secondary">
+                  {hospitalEmail}
+                </Typography>
+              )}
+            </Box>
+            <Box sx={{ flex: 1 }} />
+            <Button variant="outlined" onClick={fetchDashboardCounts}>
+              Refresh Counts
+            </Button>
+            <Button sx={{ ml: 1 }} onClick={fetchTickets}>
+              Refresh Tickets
+            </Button>
+          </Stack>
+        </Paper>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 16 }}>
-          <div style={cardStyle} onClick={() => openCardModal("pros")}>
-            <h3>Public Relations Officers</h3>
-            <p style={{ margin: "8px 0" }}>{counts.pro_count} existing</p>
-            <small>Request public relations officers (PR / communications)</small>
-          </div>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Card
+                  onClick={() => openCardModal("pros")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
+                  <CardContent>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Public Relations Officers
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {counts.pro_count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Request PR / Communications staff
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          <div style={cardStyle} onClick={() => openCardModal("staff")}>
-            <h3>Get Staff</h3>
-            <p style={{ margin: "8px 0" }}>{counts.staff_count} existing</p>
-            <small>Request permanent/temporary staff</small>
-          </div>
+              <Grid item xs={12} sm={6}>
+                <Card
+                  onClick={() => openCardModal("staff")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
+                  <CardContent>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Staff
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {counts.staff_count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Request permanent/temporary staff
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          <div style={cardStyle} onClick={() => openCardModal("doctor")}>
-            <h3>Get Doctor</h3>
-            <p style={{ margin: "8px 0" }}>{counts.doctor_count} existing</p>
-            <small>Request visiting or full-time doctors</small>
-          </div>
+              <Grid item xs={12} sm={6}>
+                <Card
+                  onClick={() => openCardModal("doctor")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
+                  <CardContent>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Doctors
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {counts.doctor_count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Request visiting or full-time doctors
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          <div style={cardStyle} onClick={() => openCardModal("other")}>
-            <h3>Other Requests</h3>
-            <p style={{ margin: "8px 0" }}>{counts.request_count} total</p>
-            <small>Any other requests (onboard, procurement)</small>
-          </div>
-        </div>
+              <Grid item xs={12} sm={6}>
+                <Card
+                  onClick={() => openCardModal("other")}
+                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                >
+                  <CardContent>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Other Requests
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      {counts.request_count}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Procurement, onboarding and other requests
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
 
-        {/* Modal */}
-        {openModal && (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: "rgba(0,0,0,0.35)",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              zIndex: 1000,
-            }}
-            onClick={() => setOpenModal(null)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: 520, background: "white", padding: 20, borderRadius: 10 }}
-            >
-              <h3 style={{ marginTop: 0 }}>
-                {openModal === "pros" ? "Request Public Relations Officers" :
-                 openModal === "staff" ? "Request Staff" :
-                 openModal === "doctor" ? "Request Doctor" : "Create Request"}
-              </h3>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                Recent Tickets
+              </Typography>
 
-              <form onSubmit={createTicket}>
-                <SmallInput label="Count" name="count" value={payloadFields.count} setValue={(v) => setPayloadFields(p => ({...p, count: v}))} type="number" placeholder="Number of persons / doctors" />
-                <SmallInput label="Location" name="location" value={payloadFields.location} setValue={(v) => setPayloadFields(p => ({...p, location: v}))} placeholder="City / area" />
-                <SmallInput label="Offered Salary (optional)" name="offered_salary" value={payloadFields.offered_salary} setValue={(v) => setPayloadFields(p => ({...p, offered_salary: v}))} placeholder="e.g. 15000/month" />
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>Notes</label>
-                  <textarea
-                    value={payloadFields.notes}
-                    onChange={(e) => setPayloadFields(p => ({...p, notes: e.target.value}))}
-                    placeholder="Any other details..."
-                    style={{ width: "100%", minHeight: 80, borderRadius: 6, padding: 8, border: "1px solid #ccc" }}
-                  />
-                </div>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                {loadingTickets ? (
+                  <Box sx={{ py: 2 }}>
+                    <LinearProgress />
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Loading tickets...
+                    </Typography>
+                  </Box>
+                ) : tickets.length === 0 ? (
+                  <Typography color="text.secondary">No tickets yet</Typography>
+                ) : (
+                  <List dense>
+                    {tickets.map((t) => (
+                      <ListItem
+                        key={t.id}
+                        button
+                        onClick={() => setSelectedTicket(t)}
+                        sx={{
+                          borderRadius: 1,
+                          my: 0.5,
+                          bgcolor: t.status === "open" ? "background.paper" : "grey.50",
+                        }}
+                      >
+                        <ListItemText
+                          primary={`${t.request_type} — #${t.id}`}
+                          secondary={
+                            <span>
+                              {t.payload && Object.keys(t.payload).length
+                                ? Object.entries(t.payload)
+                                    .slice(0, 2)
+                                    .map(([k, v]) => `${k}: ${String(v)}`)
+                                    .join(" • ")
+                                : "No details"}
+                            </span>
+                          }
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(t.created_at).toLocaleString()}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Paper>
+            </Box>
+          </Grid>
 
-                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <button type="button" onClick={() => setOpenModal(null)} style={{ padding: "8px 12px", borderRadius: 6 }}>Cancel</button>
-                  <button type="submit" style={{ padding: "8px 12px", background: "#4b6cb7", color: "white", borderRadius: 6 }}>
-                    Create Request
-                  </button>
-                </div>
+          {/* Right column */}
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                <Avatar src={logo} variant="square" sx={{ width: 56, height: 28, mr: 1 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  Open Tickets
+                </Typography>
+                <Box sx={{ flex: 1 }} />
+                <Button size="small" onClick={fetchTickets}>
+                  Refresh
+                </Button>
+              </Box>
 
-                {msg && <p style={{ marginTop: 10 }}>{msg}</p>}
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
+              <Box sx={{ mt: 1 }}>
+                {loadingTickets ? (
+                  <LinearProgress />
+                ) : tickets.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No open tickets
+                  </Typography>
+                ) : (
+                  <List dense>
+                    {tickets.slice(0, 6).map((t) => (
+                      <ListItem
+                        key={t.id}
+                        button
+                        onClick={() => setSelectedTicket(t)}
+                        sx={{ borderRadius: 1, my: 0.5 }}
+                      >
+                        <ListItemText
+                          primary={`${t.request_type} — #${t.id}`}
+                          secondary={t.payload && Object.keys(t.payload).length ? Object.entries(t.payload).slice(0,1).map(([k,v]) => `${k}: ${String(v)}`) : "No details"}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(t.created_at).toLocaleDateString()}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
 
-      {/* Right side: tickets */}
-      <div style={{ width: 420 }}>
-        <div style={{ background: "white", padding: 16, borderRadius: 10, boxShadow: "0 6px 18px rgba(0,0,0,0.06)" }}>
-          <h3 style={{ marginTop: 0 }}>Open Tickets</h3>
-          <div style={{ marginBottom: 10 }}>
-            <button onClick={fetchTickets} style={{ padding: "6px 10px", borderRadius: 6, border: "none", background: "#f1f1f1" }}>
-              Refresh
-            </button>
-          </div>
+              {selectedTicket && (
+                <Box sx={{ mt: 2 }}>
+                  <Paper variant="outlined" sx={{ p: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Ticket #{selectedTicket.id}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedTicket.request_type} • {selectedTicket.status}
+                    </Typography>
+                    <Box sx={{ mt: 1, bgcolor: "#fafafa", p: 1, borderRadius: 1 }}>
+                      <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
+                        {JSON.stringify(selectedTicket.payload, null, 2)}
+                      </pre>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+                      <Button size="small" onClick={() => navigator.clipboard.writeText(JSON.stringify(selectedTicket.payload || {}))}>
+                        Copy
+                      </Button>
+                      <Button size="small" onClick={() => setSelectedTicket(null)}>
+                        Close
+                      </Button>
+                    </Box>
+                  </Paper>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
 
-          {loadingTickets ? (
-            <p>Loading...</p>
-          ) : tickets.length === 0 ? (
-            <p style={{ color: "#666" }}>No tickets yet</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {tickets.map((t) => (
-                <div key={t.id} onClick={() => setSelectedTicket(t)} style={{ padding: 10, borderRadius: 8, border: "1px solid #eee", cursor: "pointer", background: t.status === "open" ? "#fff" : "#fafafa" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <strong>{t.request_type}</strong>
-                    <small>{new Date(t.created_at).toLocaleString()}</small>
-                  </div>
-                  <div style={{ color: "#444", marginTop: 6 }}>
-                    {t.payload && Object.keys(t.payload).length ? Object.entries(t.payload).slice(0,2).map(([k,v]) => <div key={k}><small>{k}: {String(v)}</small></div>) : <small>No details</small>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Create Request Dialog */}
+      <Dialog open={Boolean(openModal)} onClose={() => setOpenModal(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>
+            {openModal === "pros"
+              ? "Request Public Relations Officers"
+              : openModal === "staff"
+              ? "Request Staff"
+              : openModal === "doctor"
+              ? "Request Doctor"
+              : "Create Request"}
+          </span>
+          <IconButton size="small" onClick={() => setOpenModal(null)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
 
-          {/* selected ticket details */}
-          {selectedTicket && (
-            <div style={{ marginTop: 12, padding: 10, borderTop: "1px dashed #eee" }}>
-              <h4 style={{ margin: "6px 0" }}>Ticket #{selectedTicket.id}</h4>
-              <p style={{ margin: "6px 0" }}><strong>Type:</strong> {selectedTicket.request_type}</p>
-              <p style={{ margin: "6px 0" }}><strong>Status:</strong> {selectedTicket.status}</p>
-              <p style={{ margin: "6px 0" }}><strong>Created:</strong> {new Date(selectedTicket.created_at).toLocaleString()}</p>
-              <div style={{ background: "#f9f9f9", padding: 8, borderRadius: 6 }}>
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 13 }}>{JSON.stringify(selectedTicket.payload, null, 2)}</pre>
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(selectedTicket.payload || {})); }} style={{ padding: "6px 10px", borderRadius: 6 }}>
-                  Copy Payload
-                </button>
-                <button onClick={() => setSelectedTicket(null)} style={{ padding: "6px 10px", borderRadius: 6 }}>
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+        <DialogContent>
+          <Box component="form" onSubmit={createTicket}>
+            <SmallInput
+              label="Count"
+              name="count"
+              type="number"
+              value={payloadFields.count}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, count: v }))}
+              placeholder="Number of persons / doctors"
+            />
+
+            <SmallInput
+              label="Location"
+              name="location"
+              value={payloadFields.location}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, location: v }))}
+              placeholder="City / area"
+            />
+
+            <SmallInput
+              label="Offered Salary (optional)"
+              name="offered_salary"
+              value={payloadFields.offered_salary}
+              setValue={(v) => setPayloadFields((p) => ({ ...p, offered_salary: v }))}
+              placeholder="e.g. 15000/month"
+            />
+
+            <TextField
+              label="Notes"
+              name="notes"
+              value={payloadFields.notes}
+              onChange={(e) => setPayloadFields((p) => ({ ...p, notes: e.target.value }))}
+              fullWidth
+              multiline
+              rows={4}
+              margin="normal"
+              size="small"
+            />
+
+            {msg && (
+              <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                {msg}
+              </Typography>
+            )}
+
+            <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mt: 2 }}>
+              <Button onClick={() => setOpenModal(null)}>Cancel</Button>
+              <Button type="submit" variant="contained" disabled={creating}>
+                {creating ? "Creating..." : "Create Request"}
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 }
