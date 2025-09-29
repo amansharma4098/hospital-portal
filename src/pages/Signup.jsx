@@ -149,7 +149,7 @@ export default function Signup() {
               alt="Raksha360"
               variant="square"
               sx={{
-                width: 150,
+                width: 250,
                 height: 96,
                 mx: "auto",
                 mb: 1,
