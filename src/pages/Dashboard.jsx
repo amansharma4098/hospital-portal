@@ -1,5 +1,6 @@
 // src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Avatar,
   Box,
@@ -21,6 +22,7 @@ import {
   TextField,
   Typography,
   Tooltip,
+  useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
@@ -46,6 +48,9 @@ function SmallInput({ label, name, value, setValue, type = "text", placeholder =
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const theme = useTheme();
+
   const hospitalId = localStorage.getItem("hospitalId");
   const hospitalName = localStorage.getItem("hospitalName");
   const hospitalEmail = localStorage.getItem("hospitalEmail");
@@ -70,12 +75,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (!token) {
       console.warn("No hospital token found, redirecting to login");
-      window.location.href = "/login";
+      navigate("/login", { replace: true });
     } else {
       fetchDashboardCounts();
       fetchTickets();
     }
-    // eslint-disable-next-line
+    // include navigate in deps to satisfy hooks rules; token won't change during mount in this usage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchDashboardCounts() {
@@ -97,7 +103,6 @@ export default function Dashboard() {
   async function fetchTickets() {
     setLoadingTickets(true);
     try {
-      // kept compatibility: hospital/requests returns tickets for hospital (alias to /tickets)
       const res = await fetch(`${API_BASE_URL}/hospital/requests`, {
         headers: { Authorization: token ? `Bearer ${token}` : "" },
       });
@@ -194,14 +199,12 @@ export default function Dashboard() {
         body: JSON.stringify({
           details: editDetails,
           payload: payloadObj,
-          // admin/hospital difference handled on server: hospital token -> last_updated_by_hospital
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.detail || `Save failed (${res.status})`);
       }
-      // refresh
       await fetchTickets();
       await fetchDashboardCounts();
       setEditOpen(false);
@@ -226,7 +229,7 @@ export default function Dashboard() {
           Authorization: token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify({
-          status: "closed", // hospital closes -> status "closed" (admin may use "resolved")
+          status: "closed",
         }),
       });
       if (!res.ok) {
@@ -245,7 +248,6 @@ export default function Dashboard() {
   const copyPayloadToClipboard = async (payload) => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(payload || {}, null, 2));
-      // optional small feedback
     } catch (e) {
       console.error("copy failed", e);
     }
@@ -257,10 +259,25 @@ export default function Dashboard() {
     return n;
   };
 
+  // brand accent color (use theme primary / accent)
+  const accent = theme.palette.primary?.main || "#1976d2";
+  const headerBg = `linear-gradient(90deg, ${accent}15, ${accent}06)`; // subtle gradient using alpha hex suffix not supported everywhere => using rgba fallback
+  const headerBgFallback = `linear-gradient(90deg, rgba(25,118,210,0.06), rgba(25,118,210,0.02))`;
+
   return (
     <Box sx={{ py: 6, bgcolor: "background.default", minHeight: "100vh" }}>
       <Container maxWidth="lg">
-        <Paper sx={{ p: 3, borderRadius: 2, mb: 4 }}>
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: 2,
+            mb: 4,
+            background:
+              // try the CSS variable; fallback to safe rgba gradient
+              headerBgFallback,
+            border: `1px solid ${theme.palette.divider}`,
+          }}
+        >
           <Stack direction="row" alignItems="center" spacing={2}>
             <Avatar src={logo} variant="square" sx={{ width: 84, height: 36 }} />
             <Box>
@@ -286,7 +303,12 @@ export default function Dashboard() {
               <Grid item xs={12} sm={6}>
                 <Card
                   onClick={() => openCardModal("pros")}
-                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                  sx={{
+                    cursor: "pointer",
+                    height: "100%",
+                    "&:hover": { boxShadow: 6 },
+                    borderLeft: `6px solid ${accent}`,
+                  }}
                 >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -305,7 +327,12 @@ export default function Dashboard() {
               <Grid item xs={12} sm={6}>
                 <Card
                   onClick={() => openCardModal("staff")}
-                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                  sx={{
+                    cursor: "pointer",
+                    height: "100%",
+                    "&:hover": { boxShadow: 6 },
+                    borderLeft: `6px solid ${accent}`,
+                  }}
                 >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -324,7 +351,12 @@ export default function Dashboard() {
               <Grid item xs={12} sm={6}>
                 <Card
                   onClick={() => openCardModal("doctor")}
-                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                  sx={{
+                    cursor: "pointer",
+                    height: "100%",
+                    "&:hover": { boxShadow: 6 },
+                    borderLeft: `6px solid ${accent}`,
+                  }}
                 >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -343,7 +375,12 @@ export default function Dashboard() {
               <Grid item xs={12} sm={6}>
                 <Card
                   onClick={() => openCardModal("other")}
-                  sx={{ cursor: "pointer", height: "100%", "&:hover": { boxShadow: 6 } }}
+                  sx={{
+                    cursor: "pointer",
+                    height: "100%",
+                    "&:hover": { boxShadow: 6 },
+                    borderLeft: `6px solid ${accent}`,
+                  }}
                 >
                   <CardContent>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -415,7 +452,7 @@ export default function Dashboard() {
                             </span>
                           }
                         />
-                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1, minWidth: 130, textAlign: "right" }}>
                           {t.created_at ? new Date(t.created_at).toLocaleString() : ""}
                         </Typography>
                       </ListItem>

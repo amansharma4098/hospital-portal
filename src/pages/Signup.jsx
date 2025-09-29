@@ -1,3 +1,4 @@
+// src/pages/Signup.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,37 +28,9 @@ export default function Signup() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // unified storage helper — ALWAYS write to hospitalToken
-  const saveAuth = ({ token, id, name, email }) => {
-    try {
-      if (token) localStorage.setItem("hospitalToken", token);
-      if (id) localStorage.setItem("hospitalId", String(id));
-      if (name) localStorage.setItem("hospitalName", name);
-      if (email) localStorage.setItem("hospitalEmail", email);
-    } catch (err) {
-      console.warn("localStorage error:", err);
-    }
-  };
+  // NOTE: removed saveAuth & auto-login behavior intentionally.
+  // After successful registration we redirect to /login and show a success message.
 
-  const attemptLogin = async (email, password) => {
-    const body = new URLSearchParams();
-    body.append("username", email);
-    body.append("password", password);
-
-    const res = await fetch(`${API_BASE_URL}/auth/hospital/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.detail || `Login failed (${res.status})`);
-    }
-    return res.json();
-  };
-
-  // Debug-friendly handleSubmit with timeout and clear logging
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
@@ -106,39 +79,10 @@ export default function Signup() {
         return;
       }
 
-      // If backend returns token immediately
-      if (data.token) {
-        saveAuth({
-          token: data.token,
-          id: data.hospital?.id,
-          name: data.hospital?.name || form.name,
-          email: data.hospital?.email || form.email,
-        });
-        navigate("/dashboard", { replace: true });
-        return;
-      }
-
-      // fallback: try to auto-login (some deployments return 201 but not token)
-      try {
-        const loginResp = await attemptLogin(form.email, form.password);
-        const token = loginResp.token || loginResp.access_token;
-        if (token) {
-          saveAuth({
-            token,
-            id: loginResp.hospital_id,
-            name: loginResp.hospital?.name || form.name,
-            email: form.email,
-          });
-          navigate("/dashboard", { replace: true });
-        } else {
-          setMsg({ type: "success", text: "Registered — please login." });
-          navigate("/login", { replace: true });
-        }
-      } catch (loginErr) {
-        console.warn("Auto-login failed:", loginErr);
-        setMsg({ type: "success", text: "Registered — auto-login failed, please login manually." });
-        navigate("/login", { replace: true });
-      }
+      // IMPORTANT: do NOT auto-save any token here even if backend returns one.
+      // Instead redirect user to /login with a success notice.
+      setMsg({ type: "success", text: "Registered successfully — please log in." });
+      navigate("/login", { replace: true, state: { fromSignup: true } });
     } catch (err) {
       clearTimeout(timeout);
       if (err.name === "AbortError") {
@@ -291,7 +235,7 @@ export default function Signup() {
                   color="text.secondary"
                   sx={{ mt: 3, display: "block", textAlign: "center" }}
                 >
-                  By signing up you’ll be redirected to the dashboard automatically if possible.
+                  After signup you will be redirected to the login page to sign in.
                 </Typography>
               </Box>
             </Grid>
