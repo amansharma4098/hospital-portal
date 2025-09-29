@@ -22,15 +22,16 @@ export default function Signup() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: "", email: "", city: "", password: "" });
-  const [msg, setMsg] = useState(null);
+  const [msg, setMsg] = useState(null); // { type: "error"|"success", text }
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
+  // unified storage helper — ALWAYS write to hospitalToken
   const saveAuth = ({ token, id, name, email }) => {
     try {
       if (token) localStorage.setItem("hospitalToken", token);
-      if (id) localStorage.setItem("hospitalId", id);
+      if (id) localStorage.setItem("hospitalId", String(id));
       if (name) localStorage.setItem("hospitalName", name);
       if (email) localStorage.setItem("hospitalEmail", email);
     } catch (err) {
@@ -56,19 +57,37 @@ export default function Signup() {
     return res.json();
   };
 
+  // Debug-friendly handleSubmit with timeout and clear logging
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
     setLoading(true);
 
+    const payload = { name: form.name, email: form.email, city: form.city, password: form.password };
+    console.log("Signup submitting:", payload);
+
+    const controller = new AbortController();
+    const timeoutMs = 15000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const res = await fetch(`${API_BASE_URL}/hospital/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
-      const data = await res.json().catch(() => ({}));
+      clearTimeout(timeout);
+      console.log("Signup response status:", res.status);
+
+      let data = {};
+      try {
+        data = await res.json();
+        console.log("Signup response json:", data);
+      } catch (parseErr) {
+        console.warn("Signup response not JSON or empty:", parseErr);
+      }
 
       if (!res.ok) {
         if (res.status === 422 && data.detail) {
@@ -87,6 +106,7 @@ export default function Signup() {
         return;
       }
 
+      // If backend returns token immediately
       if (data.token) {
         saveAuth({
           token: data.token,
@@ -98,9 +118,10 @@ export default function Signup() {
         return;
       }
 
+      // fallback: try to auto-login (some deployments return 201 but not token)
       try {
         const loginResp = await attemptLogin(form.email, form.password);
-        const token = loginResp.token;
+        const token = loginResp.token || loginResp.access_token;
         if (token) {
           saveAuth({
             token,
@@ -114,16 +135,19 @@ export default function Signup() {
           navigate("/login", { replace: true });
         }
       } catch (loginErr) {
-        console.error("Auto-login failed:", loginErr);
-        setMsg({
-          type: "success",
-          text: "Registered — auto-login failed, please login manually.",
-        });
+        console.warn("Auto-login failed:", loginErr);
+        setMsg({ type: "success", text: "Registered — auto-login failed, please login manually." });
         navigate("/login", { replace: true });
       }
     } catch (err) {
-      console.error("Signup error:", err);
-      setMsg({ type: "error", text: "Server error" });
+      clearTimeout(timeout);
+      if (err.name === "AbortError") {
+        setMsg({ type: "error", text: `Request timed out after ${timeoutMs / 1000}s` });
+        console.error("Signup request aborted (timeout)");
+      } else {
+        console.error("Signup error:", err);
+        setMsg({ type: "error", text: "Network or server error — check console/logs" });
+      }
     } finally {
       setLoading(false);
     }
@@ -144,7 +168,7 @@ export default function Signup() {
       <Container maxWidth="lg">
         <Paper elevation={6} sx={{ borderRadius: 3, overflow: "hidden", maxWidth: 980, mx: "auto" }}>
           <Grid container>
-            {/* Left column */}
+            {/* Left column: logo + info */}
             <Grid
               item
               xs={12}
@@ -157,40 +181,118 @@ export default function Signup() {
                 justifyContent: "center",
                 p: { xs: 4, md: 6 },
                 textAlign: "center",
+                borderRight: { md: `1px solid ${theme.palette.divider}` },
               }}
             >
-              <Avatar src={logo} alt="Raksha360" variant="square" sx={{ width: 200, height: "auto", mb: 2 }} />
+              <Avatar
+                src={logo}
+                alt="Raksha360"
+                variant="square"
+                sx={{
+                  width: { xs: 180, sm: 200, md: 220 },
+                  height: "auto",
+                  mb: 2,
+                  borderRadius: 1.5,
+                }}
+              />
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                 Create your Hospital Account
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 260 }}>
                 Join Raksha360 and manage doctors, staff, and hospital resources with ease.
               </Typography>
+
               <Box sx={{ mt: 3, width: "60%", display: { xs: "none", md: "block" } }}>
                 <Divider />
               </Box>
             </Grid>
 
-            {/* Right column */}
+            {/* Right column: form */}
             <Grid item xs={12} md={7} sx={{ p: { xs: 4, sm: 6 } }}>
               <Box sx={{ maxWidth: 480, width: "100%", mx: "auto" }}>
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
                   Hospital Signup
                 </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  Fill in the details to create your account
+                </Typography>
+
                 {msg && (
                   <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
                     {msg.text}
                   </Alert>
                 )}
+
                 <Box component="form" onSubmit={handleSubmit} noValidate>
-                  <TextField label="Hospital Name" name="name" value={form.name} onChange={handleChange} fullWidth margin="normal" required />
-                  <TextField label="Email" name="email" type="email" value={form.email} onChange={handleChange} fullWidth margin="normal" required />
-                  <TextField label="City" name="city" value={form.city} onChange={handleChange} fullWidth margin="normal" required />
-                  <TextField label="Password" name="password" type="password" value={form.password} onChange={handleChange} fullWidth margin="normal" required />
-                  <Button type="submit" fullWidth variant="contained" sx={{ mt: 2, py: 1.5, fontWeight: 700 }} disabled={loading}>
+                  <TextField
+                    label="Hospital Name"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="normal"
+                    required
+                  />
+
+                  <TextField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="normal"
+                    required
+                  />
+
+                  <TextField
+                    label="City"
+                    name="city"
+                    value={form.city}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="normal"
+                    required
+                  />
+
+                  <TextField
+                    label="Password"
+                    name="password"
+                    type="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    fullWidth
+                    margin="normal"
+                    required
+                  />
+
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    sx={{
+                      mt: 2,
+                      py: 1.5,
+                      fontWeight: 700,
+                      letterSpacing: 0.6,
+                      background:
+                        theme.palette.mode === "light"
+                          ? "linear-gradient(90deg,#1976d2,#dc004e)"
+                          : undefined,
+                    }}
+                    disabled={loading}
+                  >
                     {loading ? <CircularProgress size={20} color="inherit" /> : "SIGNUP"}
                   </Button>
                 </Box>
+
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 3, display: "block", textAlign: "center" }}
+                >
+                  By signing up you’ll be redirected to the dashboard automatically if possible.
+                </Typography>
               </Box>
             </Grid>
           </Grid>
