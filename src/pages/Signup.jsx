@@ -12,6 +12,7 @@ import {
   Alert,
   CircularProgress,
   useTheme,
+  Grid,
 } from "@mui/material";
 import API_BASE_URL from "../config";
 import logo from "../assets/logo.png";
@@ -85,7 +86,6 @@ export default function Signup() {
         return;
       }
 
-      // Save immediate hospital info
       localStorage.setItem("hospitalName", form.name);
       localStorage.setItem("hospitalEmail", form.email);
 
@@ -141,105 +141,121 @@ export default function Signup() {
         px: 2,
       }}
     >
-      <Container maxWidth="sm">
-        <Paper elevation={6} sx={{ p: { xs: 3, sm: 5 }, borderRadius: 3 }}>
-          <Box sx={{ textAlign: "center", mb: 2 }}>
-            <Avatar
-              src={logo}
-              alt="Raksha360"
-              variant="square"
+      <Container maxWidth="md">
+        <Paper elevation={6} sx={{ borderRadius: 3, overflow: "hidden" }}>
+          <Grid container>
+            {/* Left side with logo */}
+            <Grid
+              item
+              xs={12}
+              md={6}
               sx={{
-                width: 250,
-                height: 96,
-                mx: "auto",
-                mb: 1,
-                boxShadow: 3,
-                borderRadius: 2,
+                bgcolor: "#f5f5f5",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 4,
               }}
-            />
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Hospital Signup
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Create your hospital account to access the portal
-            </Typography>
-          </Box>
-
-          {msg && (
-            <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
-              {msg.text}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <TextField
-              label="Hospital Name"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-
-            <TextField
-              label="Email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-
-            <TextField
-              label="City"
-              name="city"
-              value={form.city}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-
-            <TextField
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{
-                mt: 2,
-                py: 1.5,
-                fontWeight: 700,
-                background:
-                  theme.palette.mode === "light"
-                    ? "linear-gradient(90deg,#1976d2,#dc004e)"
-                    : undefined,
-              }}
-              disabled={loading}
             >
-              {loading ? <CircularProgress size={20} color="inherit" /> : "Signup"}
-            </Button>
-          </Box>
+              <Avatar
+                src={logo}
+                alt="Raksha360"
+                variant="square"
+                sx={{
+                  width: 250,
+                  height: 100,
+                  mb: 3,
+                  borderRadius: 2,
+                }}
+              />
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+                Welcome to Raksha360
+              </Typography>
+              <Typography variant="body2" color="text.secondary" align="center">
+                Create your hospital account and manage staff, doctors, and resources
+                seamlessly with Raksha360.
+              </Typography>
+            </Grid>
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mt: 3, display: "block", textAlign: "center" }}
-          >
-            By signing up you’ll be redirected to the dashboard automatically if possible.
-          </Typography>
+            {/* Right side with form */}
+            <Grid item xs={12} md={6} sx={{ p: { xs: 3, sm: 5 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Hospital Signup
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Fill in the details to create your account
+              </Typography>
+
+              {msg && (
+                <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
+                  {msg.text}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleSubmit} noValidate>
+                <TextField
+                  label="Hospital Name"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+
+                <TextField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+
+                <TextField
+                  label="City"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+
+                <TextField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  sx={{
+                    mt: 2,
+                    py: 1.5,
+                    fontWeight: 700,
+                    background:
+                      theme.palette.mode === "light"
+                        ? "linear-gradient(90deg,#1976d2,#dc004e)"
+                        : undefined,
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? <CircularProgress size={20} color="inherit" /> : "Signup"}
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
         </Paper>
       </Container>
     </Box>

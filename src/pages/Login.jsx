@@ -12,6 +12,7 @@ import {
   Alert,
   CircularProgress,
   useTheme,
+  Grid,
 } from "@mui/material";
 import API_BASE_URL from "../config";
 import logo from "../assets/logo.png";
@@ -29,8 +30,8 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMsg(null);
-
     setLoading(true);
+
     try {
       const formData = new URLSearchParams();
       formData.append("username", form.email);
@@ -71,11 +72,9 @@ export default function Login() {
             if (email) localStorage.setItem("hospitalEmail", email);
           }
         } catch (err) {
-          // ignore detail fetch errors
           console.warn("Failed to fetch hospital details:", err);
         }
 
-        // redirect to dashboard
         navigate("/dashboard");
       } else {
         setMsg({ type: "error", text: data.detail || "Login failed" });
@@ -91,120 +90,137 @@ export default function Login() {
   return (
     <Box
       sx={{
-        minHeight: "80vh",
+        minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        bgcolor: "background.default",
         py: 6,
         px: 2,
-        bgcolor: "background.default",
       }}
     >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={6}
-          sx={{
-            p: { xs: 3, sm: 5 },
-            borderRadius: 3,
-            overflow: "hidden",
-          }}
-        >
-          <Box sx={{ textAlign: "center", mb: 2 }}>
-            <Avatar
-              src={logo}
-              alt="Raksha360"
-              variant="square"
+      <Container maxWidth="md">
+        <Paper elevation={6} sx={{ borderRadius: 3, overflow: "hidden" }}>
+          <Grid container>
+            {/* Left column: logo + text */}
+            <Grid
+              item
+              xs={12}
+              md={6}
               sx={{
-                width: 250,
-                height: 96,
-                mx: "auto",
-                mb: 1,
-                boxShadow: 3,
-                borderRadius: 2,
+                bgcolor: "#f5f5f5",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 4,
               }}
-            />
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Hospital Portal
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Sign in to manage hospital requests and staff
-            </Typography>
-          </Box>
-
-          {msg && (
-            <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
-              {msg.text}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <TextField
-              label="Email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-              autoComplete="email"
-              autoFocus
-            />
-
-            <TextField
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              fullWidth
-              margin="normal"
-              required
-              autoComplete="current-password"
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{
-                mt: 2,
-                py: 1.5,
-                fontWeight: 700,
-                background:
-                  theme.palette.mode === "light"
-                    ? "linear-gradient(90deg,#1976d2,#dc004e)"
-                    : undefined,
-              }}
-              disabled={loading}
             >
-              {loading ? <CircularProgress size={20} color="inherit" /> : "Login"}
-            </Button>
-          </Box>
+              <Avatar
+                src={logo}
+                alt="Raksha360"
+                variant="square"
+                sx={{
+                  width: 250,
+                  height: 100,
+                  mb: 3,
+                  borderRadius: 2,
+                }}
+              />
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+                Raksha360 Hospital Portal
+              </Typography>
+              <Typography variant="body2" color="text.secondary" align="center">
+                Sign in to manage hospital requests, staff and equipment. Secure, fast and easy
+                to use.
+              </Typography>
+            </Grid>
 
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mt: 2,
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography variant="body2" color="text.secondary">
-              Don't have an account?
-            </Typography>
+            {/* Right column: form */}
+            <Grid item xs={12} md={6} sx={{ p: { xs: 3, sm: 5 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                Welcome back
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Enter your credentials to access the dashboard
+              </Typography>
 
-            <Button
-              component={RouterLink}
-              to="/signup"
-              variant="text"
-              size="small"
-              sx={{ textTransform: "none" }}
-            >
-              Create a hospital account (Signup)
-            </Button>
-          </Box>
+              {msg && (
+                <Alert severity={msg.type === "error" ? "error" : "success"} sx={{ mb: 2 }}>
+                  {msg.text}
+                </Alert>
+              )}
+
+              <Box component="form" onSubmit={handleSubmit} noValidate>
+                <TextField
+                  label="Email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                  autoComplete="email"
+                  autoFocus
+                />
+
+                <TextField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  fullWidth
+                  margin="normal"
+                  required
+                  autoComplete="current-password"
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  sx={{
+                    mt: 2,
+                    py: 1.5,
+                    fontWeight: 700,
+                    background:
+                      theme.palette.mode === "light"
+                        ? "linear-gradient(90deg,#1976d2,#dc004e)"
+                        : undefined,
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? <CircularProgress size={20} color="inherit" /> : "Login"}
+                </Button>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mt: 2,
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Don't have an account?
+                </Typography>
+
+                <Button
+                  component={RouterLink}
+                  to="/signup"
+                  variant="text"
+                  size="small"
+                  sx={{ textTransform: "none" }}
+                >
+                  Create a hospital account (Signup)
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
         </Paper>
       </Container>
     </Box>
