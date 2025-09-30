@@ -47,6 +47,15 @@ function SmallInput({ label, name, value, setValue, type = "text", placeholder =
   );
 }
 
+function normalizeFrontType(openModal) {
+  if (!openModal) return "OTHER";
+  const s = String(openModal).toLowerCase();
+  if (s === "pros" || s === "pro") return "PRO";
+  if (s === "staff") return "STAFF";
+  if (s === "doctor") return "DOCTOR";
+  return openModal.toUpperCase();
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -68,6 +77,7 @@ export default function Dashboard() {
   // edit modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editDetails, setEditDetails] = useState("");
+  const [editCount, setEditCount] = useState("");
   const [editPayloadText, setEditPayloadText] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -80,7 +90,6 @@ export default function Dashboard() {
       fetchDashboardCounts();
       fetchTickets();
     }
-    // include navigate in deps to satisfy hooks rules; token won't change during mount in this usage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -130,24 +139,30 @@ export default function Dashboard() {
     e.preventDefault();
     if (!openModal) return;
 
-    const request_type =
-      openModal === "pros" ? "get_pro" : openModal === "staff" ? "get_staff" : openModal === "doctor" ? "get_doctor" : "other_request";
+    // map to normalized type (server will also normalize)
+    const type = normalizeFrontType(openModal);
 
-    const payload = {};
-    if (payloadFields.count) payload.count = Number(payloadFields.count);
-    if (payloadFields.location) payload.location = payloadFields.location;
-    if (payloadFields.offered_salary) payload.offered_salary = payloadFields.offered_salary;
-    if (payloadFields.notes) payload.notes = payloadFields.notes;
+    // prefer explicit count + description fields (no payload wrapper)
+    const count = payloadFields.count ? Number(payloadFields.count) : undefined;
+    // build a short description from location/offered_salary/notes
+    const descriptionPieces = [];
+    if (payloadFields.location) descriptionPieces.push(`Location: ${payloadFields.location}`);
+    if (payloadFields.offered_salary) descriptionPieces.push(`Offered salary: ${payloadFields.offered_salary}`);
+    if (payloadFields.notes) descriptionPieces.push(`${payloadFields.notes}`);
+    const description = descriptionPieces.join(" | ") || undefined;
+
+    const body = { type, count, description };
 
     try {
       setCreating(true);
+      setMsg("");
       const res = await fetch(`${API_BASE_URL}/hospital/requests`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({ request_type, payload }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -157,7 +172,13 @@ export default function Dashboard() {
         await fetchTickets();
         await fetchDashboardCounts();
       } else {
-        setMsg(data.detail || "Failed to create request");
+        // show backend validation messages
+        if (data?.detail) {
+          if (Array.isArray(data.detail)) setMsg(data.detail.map(d => d.msg || JSON.stringify(d)).join(" • "));
+          else setMsg(data.detail || `Failed (${res.status})`);
+        } else {
+          setMsg(data.error || `Failed to create request (${res.status})`);
+        }
       }
     } catch (err) {
       console.error("createTicket error:", err);
@@ -170,7 +191,8 @@ export default function Dashboard() {
   // --- Edit ticket handlers (inline modal) ---
   function openEditModal(ticket) {
     setSelectedTicket(ticket);
-    setEditDetails(ticket.details || "");
+    setEditDetails(ticket.description || ticket.details || "");
+    setEditCount(ticket.count !== undefined && ticket.count !== null ? String(ticket.count) : "");
     setEditPayloadText(ticket.payload ? JSON.stringify(ticket.payload, null, 2) : "");
     setEditError("");
     setEditOpen(true);
@@ -188,6 +210,12 @@ export default function Dashboard() {
         return;
       }
     }
+    const body = {
+      details: editDetails,
+      description: editDetails,
+      payload: payloadObj,
+      count: editCount ? Number(editCount) : null
+    };
     setEditSaving(true);
     try {
       const res = await fetch(`${API_BASE_URL}/tickets/${selectedTicket.id}`, {
@@ -196,10 +224,7 @@ export default function Dashboard() {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({
-          details: editDetails,
-          payload: payloadObj,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -255,7 +280,7 @@ export default function Dashboard() {
 
   // Helper to render count (hide zeroes)
   const renderCount = (n) => {
-    if (!n || Number(n) === 0) return "—";
+    if (n === null || n === undefined || Number(n) === 0) return "—";
     return n;
   };
 
@@ -273,7 +298,6 @@ export default function Dashboard() {
             borderRadius: 2,
             mb: 4,
             background:
-              // try the CSS variable; fallback to safe rgba gradient
               headerBgFallback,
             border: `1px solid ${theme.palette.divider}`,
           }}
@@ -443,12 +467,9 @@ export default function Dashboard() {
                           primary={`${t.type || t.request_type} — #${t.id}`}
                           secondary={
                             <span>
-                              {t.payload && Object.keys(t.payload).length
-                                ? Object.entries(t.payload)
-                                    .slice(0, 2)
-                                    .map(([k, v]) => `${k}: ${String(v)}`)
-                                    .join(" • ")
-                                : t.details || "No details"}
+                              {t.count ? `Count: ${t.count}` : null}
+                              {t.count && (t.description || t.details) ? " • " : ""}
+                              {t.description || t.details || "No details"}
                             </span>
                           }
                         />
@@ -496,11 +517,9 @@ export default function Dashboard() {
                         <ListItemText
                           primary={`${t.type || t.request_type} — #${t.id}`}
                           secondary={
-                            t.payload && Object.keys(t.payload).length
-                              ? Object.entries(t.payload)
-                                  .slice(0, 1)
-                                  .map(([k, v]) => `${k}: ${String(v)}`)
-                              : t.details || "No details"
+                            t.count
+                              ? `Count: ${t.count}`
+                              : t.description || t.details || "No details"
                           }
                         />
                         <Typography variant="caption" color="text.secondary">
@@ -540,7 +559,11 @@ export default function Dashboard() {
 
                     <Box sx={{ mt: 1, bgcolor: "#fafafa", p: 1, borderRadius: 1 }}>
                       <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>
-                        {JSON.stringify(selectedTicket.payload || selectedTicket.details || {}, null, 2)}
+                        {JSON.stringify(
+                          selectedTicket.count ? { count: selectedTicket.count, description: selectedTicket.description || selectedTicket.details } : (selectedTicket.payload || selectedTicket.details || {}),
+                          null,
+                          2
+                        )}
                       </pre>
                     </Box>
 
@@ -644,7 +667,7 @@ export default function Dashboard() {
         <DialogContent>
           <Box sx={{ mt: 1 }}>
             <TextField
-              label="Details"
+              label="Description"
               value={editDetails}
               onChange={(e) => setEditDetails(e.target.value)}
               fullWidth
@@ -652,6 +675,16 @@ export default function Dashboard() {
               rows={3}
               margin="normal"
             />
+
+            <SmallInput
+              label="Count"
+              name="edit_count"
+              type="number"
+              value={editCount}
+              setValue={(v) => setEditCount(v)}
+              placeholder="Number requested"
+            />
+
             <Typography variant="body2" sx={{ mb: 1 }}>
               Payload (JSON)
             </Typography>
