@@ -306,7 +306,7 @@ export default function Dashboard() {
             <Avatar src={logo} variant="square" sx={{ width: 84, height: 36 }} />
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {hospitalName || `Hospital ID: ${hospitalName}`}
+                {hospitalName || `Hospital: ${hospitalName}`}
               </Typography>
               {hospitalEmail && <Typography variant="body2" color="text.secondary">{hospitalEmail}</Typography>}
             </Box>
