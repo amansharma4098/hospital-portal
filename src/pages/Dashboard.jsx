@@ -1,316 +1,211 @@
-// Dashboard.jsx
-import React, { useState, useEffect } from "react";
-import {
-  AppBar,
-  Toolbar,
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Avatar,
-  IconButton,
-  Tooltip,
-  Chip,
-  Fab,
-  Modal,
-  Paper,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-} from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import AddIcon from "@mui/icons-material/Add";
-import PersonIcon from "@mui/icons-material/Person";
-import PeopleIcon from "@mui/icons-material/People";
-import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import CloseIcon from "@mui/icons-material/Close";
+// src/pages/Dashboard.jsx
+import React, { useEffect, useState } from "react";
+import { Box, Container, Grid, Paper, Button, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import API_BASE_URL from "../config";
+import logo from "../assets/logo.png";
+import HeaderBar from "../components/HeaderBar";
+import StatsCards from "../components/StatsCards";
+import RecentTicketsList from "../components/RecentTicketsList";
+import OpenTicketsPanel from "../components/OpenTicketsPanel";
+import TicketDetailsCard from "../components/TicketDetailsCard";
+import CreateRequestDialog from "../components/CreateRequestDialog";
+import EditTicketDialog from "../components/EditTicketDialog";
 
-export default function Dashboard({
-  logo = "/assets/logo.png",           // path to logo image
-  hospitalName = "Raksha360 Hospital" // replace dynamically if you want
-}) {
-  // --- Mock / demo state: replace with API calls ---
-  const [counts, setCounts] = useState({ pr: 3, staff: 12, doctors: 6, other: 2 });
-  const [animatedCounts, setAnimatedCounts] = useState({ pr: 0, staff: 0, doctors: 0, other: 0 });
-  const [tickets, setTickets] = useState([
-    { id: 1, title: "PRO — #2", summary: "No details", time: "9/30/2025 7:51 PM", status: "open" },
-    { id: 2, title: "STAFF — #41", summary: "Request for onboarding", time: "10/02/2025 10:20 AM", status: "inprogress" },
-  ]);
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const hospitalName = localStorage.getItem("hospitalName");
+  const hospitalEmail = localStorage.getItem("hospitalEmail");
+  const token = localStorage.getItem("hospitalToken");
+
+  const [counts, setCounts] = useState({ staff_count: 0, doctor_count: 0, pro_count: 0, request_count: 0 });
+  const [tickets, setTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [openModal, setOpenModal] = useState(null);
+  const [payloadFields, setPayloadFields] = useState({ count: "", location: "", offered_salary: "", notes: "" });
+  const [msg, setMsg] = useState("");
+  const [creating, setCreating] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [openModal, setOpenModal] = useState(false);
 
-  // small count animation (simple)
+  // edit modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDetails, setEditDetails] = useState("");
+  const [editCount, setEditCount] = useState("");
+  const [editPayloadText, setEditPayloadText] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
   useEffect(() => {
-    const duration = 700; // ms
-    const steps = 20;
-    const intervalMs = Math.max(10, duration / steps);
-    let step = 0;
-    const start = { pr: 0, staff: 0, doctors: 0, other: 0 };
-    const deltas = {
-      pr: counts.pr - start.pr,
-      staff: counts.staff - start.staff,
-      doctors: counts.doctors - start.doctors,
-      other: counts.other - start.other,
-    };
-    const timer = setInterval(() => {
-      step++;
-      const factor = Math.min(1, step / steps);
-      setAnimatedCounts({
-        pr: Math.round(start.pr + deltas.pr * factor),
-        staff: Math.round(start.staff + deltas.staff * factor),
-        doctors: Math.round(start.doctors + deltas.doctors * factor),
-        other: Math.round(start.other + deltas.other * factor),
+    if (!token) {
+      navigate("/login", { replace: true });
+    } else {
+      fetchDashboardCounts();
+      fetchTickets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function fetchDashboardCounts() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/hospital/dashboard`, { headers: { Authorization: token ? `Bearer ${token}` : "" }});
+      if (res.ok) setCounts(await res.json());
+    } catch (err) { console.error(err); }
+  }
+
+  async function fetchTickets() {
+    setLoadingTickets(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/hospital/requests`, { headers: { Authorization: token ? `Bearer ${token}` : "" }});
+      if (res.ok) setTickets(await res.json());
+      else setTickets([]);
+    } catch (err) { console.error(err); setTickets([]); }
+    finally { setLoadingTickets(false); }
+  }
+
+  function openCardModal(type) {
+    setPayloadFields({ count: "", location: "", offered_salary: "", notes: "" });
+    setOpenModal(type);
+    setMsg("");
+  }
+
+  function normalizeFrontType(openModal) {
+    if (!openModal) return "OTHER";
+    const s = String(openModal).toLowerCase();
+    if (s === "pros" || s === "pro") return "PRO";
+    if (s === "staff") return "STAFF";
+    if (s === "doctor") return "DOCTOR";
+    return openModal.toUpperCase();
+  }
+
+  const createTicket = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!openModal) return;
+    const type = normalizeFrontType(openModal);
+    const count = payloadFields.count ? Number(payloadFields.count) : undefined;
+    const descriptionPieces = [];
+    if (payloadFields.location) descriptionPieces.push(`Location: ${payloadFields.location}`);
+    if (payloadFields.offered_salary) descriptionPieces.push(`Offered salary: ${payloadFields.offered_salary}`);
+    if (payloadFields.notes) descriptionPieces.push(`${payloadFields.notes}`);
+    const description = descriptionPieces.join(" | ") || undefined;
+    const body = { type, count, description };
+
+    try {
+      setCreating(true);
+      setMsg("");
+      const res = await fetch(`${API_BASE_URL}/hospital/requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: token ? `Bearer ${token}` : "" },
+        body: JSON.stringify(body),
       });
-      if (factor === 1) clearInterval(timer);
-    }, intervalMs);
-    return () => clearInterval(timer);
-  }, [counts]);
-
-  // handlers
-  const handleRefreshCounts = () => {
-    // TODO: replace with real API call to fetch counts
-    // demo: randomize slightly
-    setCounts({
-      pr: Math.max(0, counts.pr + (Math.round(Math.random() * 3) - 1)),
-      staff: Math.max(0, counts.staff + (Math.round(Math.random() * 5) - 2)),
-      doctors: Math.max(0, counts.doctors + (Math.round(Math.random() * 3) - 1)),
-      other: Math.max(0, counts.other + (Math.round(Math.random() * 2) - 1)),
-    });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setOpenModal(null);
+        await fetchTickets();
+        await fetchDashboardCounts();
+      } else {
+        setMsg(data?.detail || data?.error || `Failed (${res.status})`);
+      }
+    } catch (err) {
+      console.error(err); setMsg("Server error");
+    } finally { setCreating(false); }
   };
 
-  const handleRefreshTickets = () => {
-    // TODO: replace with real API call
-    setTickets((t) => [
-      ...t,
-      { id: Date.now(), title: "NEW — #" + (t.length + 1), summary: "Auto-added demo ticket", time: new Date().toLocaleString(), status: "open" },
-    ]);
-  };
-
-  const openTicket = (ticket) => {
+  function openEditModal(ticket) {
     setSelectedTicket(ticket);
-    setOpenModal(true);
-  };
-  const closeTicket = () => {
-    setSelectedTicket(null);
-    setOpenModal(false);
+    setEditDetails(ticket.description || ticket.details || "");
+    setEditCount(ticket.count !== undefined && ticket.count !== null ? String(ticket.count) : "");
+    setEditPayloadText(ticket.payload ? JSON.stringify(ticket.payload, null, 2) : "");
+    setEditError("");
+    setEditOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!selectedTicket) return;
+    setEditError("");
+    let payloadObj = null;
+    if (editPayloadText && editPayloadText.trim()) {
+      try { payloadObj = JSON.parse(editPayloadText); } catch (e) { setEditError("Payload must be valid JSON."); return; }
+    }
+    const body = { details: editDetails, description: editDetails, payload: payloadObj, count: editCount ? Number(editCount) : null };
+    setEditSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/tickets/${selectedTicket.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: token ? `Bearer ${token}` : "" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.detail || `Save failed (${res.status})`);
+      }
+      await fetchTickets();
+      await fetchDashboardCounts();
+      setEditOpen(false);
+      setSelectedTicket(null);
+    } catch (err) {
+      console.error(err); setEditError(err.message || "Save failed");
+    } finally { setEditSaving(false); }
+  }
+
+  async function handleCloseTicket(ticket) {
+    if (!ticket) return;
+    const ok = window.confirm(`Close ticket #${ticket.id}? This action cannot be undone.`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/tickets/${ticket.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: token ? `Bearer ${token}` : "" },
+        body: JSON.stringify({ status: "closed" }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.detail || `Close failed (${res.status})`);
+      }
+      await fetchTickets(); await fetchDashboardCounts(); setSelectedTicket(null);
+    } catch (err) { console.error(err); alert(err.message || "Failed to close ticket"); }
+  }
+
+  const copyPayloadToClipboard = async (payload) => {
+    try { await navigator.clipboard.writeText(JSON.stringify(payload || {}, null, 2)); } catch (e) { console.error("copy failed", e); }
   };
 
-  // small card component
-  const StatCard = ({ icon, title, subtitle, value }) => (
-    <Card
-      elevation={2}
-      sx={{
-        transition: "transform 180ms ease, box-shadow 180ms ease",
-        "&:hover": { transform: "translateY(-6px)", boxShadow: 6 },
-        borderLeft: (theme) => `6px solid ${theme.palette.primary.main}`,
-        minHeight: 110,
-        display: "flex",
-        alignItems: "center",
-      }}
-    >
-      <Box sx={{ width: 12 }} />
-      <CardContent sx={{ flex: 1 }}>
-        <Typography variant="subtitle2" color="text.secondary">{title}</Typography>
-        <Typography variant="h6" sx={{ fontWeight: 600, mt: 0.5 }}>{value}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{subtitle}</Typography>
-      </CardContent>
-      <Box sx={{ pr: 2 }}>
-        <Avatar variant="rounded" sx={{ bgcolor: "transparent" }}>
-          {icon}
-        </Avatar>
-      </Box>
-    </Card>
-  );
+  const accent = "#1976d2";
 
   return (
-    <Box>
-      {/* Top bar */}
-      <AppBar position="static" color="primary" enableColorOnDark>
-        <Toolbar sx={{ justifyContent: "space-between" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Avatar src={logo} alt="logo" sx={{ width: 46, height: 46 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{hospitalName}</Typography>
-            <Chip label="Admin" size="small" sx={{ ml: 1 }} />
-          </Box>
-
-          <Box>
-            <Tooltip title="Refresh counts">
-              <IconButton color="inherit" onClick={handleRefreshCounts}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-            <Button variant="outlined" color="inherit" sx={{ ml: 1 }} onClick={handleRefreshTickets}>
-              Refresh Tickets
-            </Button>
-          </Box>
-        </Toolbar>
-      </AppBar>
-
-      {/* Main container */}
-      <Box sx={{ maxWidth: 1180, mx: "auto", p: 3 }}>
-        {/* Intro card with logo bigger on left */}
-        <Paper elevation={1} sx={{ p: 3, display: "flex", alignItems: "center", gap: 3, mb: 3 }}>
-          <Avatar src={logo} alt="logo" sx={{ width: 84, height: 84 }} />
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>{hospitalName}</Typography>
-            <Typography variant="body2" color="text.secondary">Patient-first care & staff management portal</Typography>
-          </Box>
-
-          <Box>
-            <Button variant="contained" startIcon={<LocalHospitalIcon />} sx={{ mr: 1 }}>
-              Open Dashboard
-            </Button>
-            <Button variant="outlined" startIcon={<ReceiptLongIcon />} onClick={handleRefreshCounts}>
-              Refresh
-            </Button>
-          </Box>
+    <Box sx={{ py: 6, bgcolor: "background.default", minHeight: "100vh" }}>
+      <Container maxWidth="lg">
+        <Paper sx={{ p: 3, borderRadius: 2, mb: 4, border: `1px solid #e0e0e0` }}>
+          <HeaderBar logo={logo} hospitalName={hospitalName} hospitalEmail={hospitalEmail} onRefreshCounts={fetchDashboardCounts} onRefreshTickets={fetchTickets} />
         </Paper>
 
-        {/* Stat cards */}
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} md={3}>
-            <StatCard
-              icon={<PeopleIcon />}
-              title="Public Relations Officers"
-              subtitle="Request PR / Communications staff"
-              value={animatedCounts.pr}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <StatCard
-              icon={<PersonIcon />}
-              title="Staff"
-              subtitle="Request permanent/temporary staff"
-              value={animatedCounts.staff}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <StatCard
-              icon={<LocalHospitalIcon />}
-              title="Doctors"
-              subtitle="Request visiting or full-time doctors"
-              value={animatedCounts.doctors}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <StatCard
-              icon={<ReceiptLongIcon />}
-              title="Other Requests"
-              subtitle="Procurement, onboarding and other requests"
-              value={animatedCounts.other}
-            />
-          </Grid>
-        </Grid>
-
-        {/* Recent Tickets */}
-        <Typography variant="h6" sx={{ mt: 1, mb: 1 }}>Recent Tickets</Typography>
-        <Box>
-          <List>
-            {tickets.map((t) => (
-              <ListItem
-                key={t.id}
-                sx={{
-                  my: 1,
-                  borderRadius: 1,
-                  boxShadow: 1,
-                  transition: "background 150ms, transform 120ms",
-                  "&:hover": { transform: "translateY(-4px)", cursor: "pointer", background: "rgba(0,0,0,0.02)" },
-                }}
-                onClick={() => openTicket(t)}
-                secondaryAction={
-                  <Box sx={{ textAlign: "right" }}>
-                    <Typography variant="caption" color="text.secondary">{t.time}</Typography>
-                    <Box>{t.status === "open" ? <Chip label="Open" size="small" color="primary" /> : <Chip label={t.status} size="small" />}</Box>
-                  </Box>
-                }
-              >
-                <ListItemText
-                  primary={<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{t.title}</Typography>}
-                  secondary={<Typography variant="body2" color="text.secondary">{t.summary}</Typography>}
-                />
-              </ListItem>
-            ))}
-          </List>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
-
-        {/* Small open tickets panel */}
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
-            <Card elevation={1} sx={{ p: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
-                <img src={logo} alt="logo-small" style={{ width: 28, height: 28 }} />
-                Open Tickets <Button size="small" onClick={handleRefreshTickets} sx={{ ml: 1 }}>REFRESH</Button>
-              </Typography>
-              <Box sx={{ mt: 1 }}>
-                {tickets.slice(0, 3).map(t => (
-                  <Box key={t.id} sx={{ py: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{t.title}</Typography>
-                    <Typography variant="caption" color="text.secondary">{t.summary}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Card>
-          </Grid>
-
+        <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
-            {/* placeholder for charts / analytics – recommended: insert charts here */}
-            <Card sx={{ p: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Analytics</Typography>
-              <Typography variant="body2" color="text.secondary">Add charts for request trends, SLA breaches and response time here.</Typography>
-            </Card>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <StatsCards counts={counts} onCardClick={openCardModal} accent={accent} />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" sx={{ mb: 1 }}>Recent Tickets</Typography>
+              <RecentTicketsList tickets={tickets} loading={loadingTickets} onEdit={openEditModal} onClose={handleCloseTicket} onSelect={(t) => setSelectedTicket(t)} />
+            </Box>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <OpenTicketsPanel logo={logo} tickets={tickets} loading={loadingTickets} onRefresh={fetchTickets} onSelect={(t) => setSelectedTicket(t)} onEdit={openEditModal} onCopy={copyPayloadToClipboard} />
+
+            {selectedTicket && (
+              <Box sx={{ mt: 2 }}>
+                <TicketDetailsCard ticket={selectedTicket} onClose={() => setSelectedTicket(null)} onCloseTicket={handleCloseTicket} onEdit={openEditModal} onCopy={copyPayloadToClipboard} />
+              </Box>
+            )}
           </Grid>
         </Grid>
-      </Box>
+      </Container>
 
-      {/* Floating action button */}
-      <Fab
-        color="primary"
-        aria-label="add"
-        sx={{ position: "fixed", right: 28, bottom: 28 }}
-        onClick={() => alert("Open ticket create modal (implement)") }
-      >
-        <AddIcon />
-      </Fab>
-
-      {/* Ticket modal */}
-      <Modal open={openModal} onClose={closeTicket}>
-        <Box
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: { xs: "92%", md: 640 },
-            bgcolor: "background.paper",
-            boxShadow: 24,
-            borderRadius: 2,
-            p: 3,
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{selectedTicket?.title}</Typography>
-            <IconButton onClick={closeTicket}><CloseIcon /></IconButton>
-          </Box>
-          <Divider sx={{ mb: 2 }} />
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{selectedTicket?.summary}</Typography>
-
-          <Typography variant="body2"><strong>Time:</strong> {selectedTicket?.time}</Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}><strong>Status:</strong> {selectedTicket?.status}</Typography>
-
-          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 3 }}>
-            <Button onClick={closeTicket}>Close</Button>
-            <Button variant="contained" color="primary">Mark Resolved</Button>
-          </Box>
-        </Box>
-      </Modal>
+      <CreateRequestDialog open={Boolean(openModal)} onClose={() => setOpenModal(null)} payloadFields={payloadFields} setPayloadFields={setPayloadFields} onCreate={createTicket} creating={creating} msg={msg} openModal={openModal} />
+      <EditTicketDialog open={editOpen} onClose={() => setEditOpen(false)} editDetails={editDetails} setEditDetails={setEditDetails} editCount={editCount} setEditCount={setEditCount} editPayloadText={editPayloadText} setEditPayloadText={setEditPayloadText} onSave={handleSaveEdit} saving={editSaving} error={editError} selectedTicket={selectedTicket} />
     </Box>
   );
 }
-
-
