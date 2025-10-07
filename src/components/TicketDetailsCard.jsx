@@ -1,67 +1,184 @@
-// src/components/TicketDetailsCard.jsx
+// src/components/RecentTicketsList.jsx
 import React from "react";
-import { Box, Button, Card, CardContent, Chip, Divider, IconButton, Typography } from "@mui/material";
+import {
+  Box,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  Typography,
+  IconButton,
+  Tooltip,
+  Chip,
+  Button,
+  Skeleton,
+  Divider,
+} from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
-import CopyAllIcon from "@mui/icons-material/CopyAll";
+import DoneIcon from "@mui/icons-material/Done";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
-export default function TicketDetailsCard({ ticket, onClose, onCloseTicket, onEdit, onCopy }) {
-  if (!ticket) return null;
+function formatDateTime(d) {
+  if (!d) return "";
+  try {
+    return new Date(d).toLocaleString();
+  } catch {
+    return String(d);
+  }
+}
 
-  const payloadExists = ticket.payload && Object.keys(ticket.payload || {}).length > 0;
-  const description = ticket.description || ticket.details || "";
+export default function RecentTicketsList({ tickets = [], loading = false, onEdit, onClose, onSelect }) {
+  if (loading) {
+    return (
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Box sx={{ py: 1 }}>
+          <LinearProgress />
+        </Box>
+        <Box sx={{ mt: 2 }}>
+          {[1, 2, 3].map((i) => (
+            <Box key={i} sx={{ display: "flex", gap: 2, alignItems: "center", mb: 1 }}>
+              <Skeleton variant="rectangular" width={48} height={48} sx={{ borderRadius: 1 }} />
+              <Box sx={{ flex: 1 }}>
+                <Skeleton width="40%" />
+                <Skeleton width="70%" />
+              </Box>
+              <Skeleton width={120} />
+            </Box>
+          ))}
+        </Box>
+        <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
+          Loading tickets...
+        </Typography>
+      </Paper>
+    );
+  }
+
+  if (!tickets || tickets.length === 0) {
+    return (
+      <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
+        <Typography color="text.secondary">No tickets yet</Typography>
+        <Button size="small" sx={{ mt: 1 }} onClick={() => onSelect && onSelect(null)}>
+          Create first ticket
+        </Button>
+      </Paper>
+    );
+  }
 
   return (
-    <Card variant="outlined" sx={{ p: 1 }}>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{ticket.type || ticket.request_type || `Ticket #${ticket.id}`}</Typography>
-            <Chip label={ticket.type || ticket.request_type || "GENERAL"} size="small" />
-            <Chip label={ticket.status ? ticket.status.toUpperCase() : "OPEN"} size="small" sx={{ ml: 1 }} color={ticket.status === "closed" ? "default" : "primary"} />
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            #{ticket.id} • {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : ""}
-          </Typography>
-        </Box>
-
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <IconButton size="small" onClick={() => onEdit(ticket)}><EditIcon fontSize="small" /></IconButton>
-          <IconButton size="small" onClick={() => onCopy(ticket.payload)}><CopyAllIcon fontSize="small" /></IconButton>
-        </Box>
+    <Paper variant="outlined" sx={{ p: 0 }}>
+      <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          Recent Tickets
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {tickets.length} total
+        </Typography>
       </Box>
 
-      <Divider sx={{ my: 1 }} />
+      <Divider />
 
-      <CardContent sx={{ pt: 0 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1 }}>Description</Typography>
+      <List dense>
+        {tickets.map((t) => {
+          const title = `${t.type || t.request_type || "REQ"} — #${t.id}`;
+          const parts = [];
+          if (t.count) parts.push(`Count: ${t.count}`);
+          if (t.description || t.details) parts.push(t.description || t.details);
+          const subtitle = parts.join(" • ") || "No details";
+          const ts = t.created_at || t.createdAt || t.time || t.timestamp;
 
-        {description && String(description).trim().length ? (
-          <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", mb: 2 }}>{description}</Typography>
-        ) : (
-          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic", mb: 2 }}>No description provided.</Typography>
-        )}
+          const status = (t.status || t.state || "").toString().toLowerCase();
 
-        {ticket.count !== undefined && ticket.count !== null && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2">Count</Typography>
-            <Typography variant="body1" sx={{ fontWeight: 700 }}>{ticket.count}</Typography>
-          </Box>
-        )}
+          return (
+            <ListItem
+              key={t.id}
+              disableGutters
+              button
+              onClick={() => onSelect && onSelect(t)}
+              sx={{
+                px: 2,
+                py: 1.25,
+                borderRadius: 1,
+                mx: 2,
+                my: 1,
+                transition: "transform 140ms ease, box-shadow 140ms ease",
+                "&:hover": { transform: "translateY(-4px)", boxShadow: 3 },
+                alignItems: "flex-start",
+              }}
+            >
+              <ListItemText
+                primary={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {title}
+                    </Typography>
+                    {!!status && (
+                      <Chip
+                        label={status}
+                        size="small"
+                        sx={{ textTransform: "capitalize", ml: 0.5 }}
+                        color={status === "open" ? "primary" : status === "closed" ? "default" : "warning"}
+                      />
+                    )}
+                  </Box>
+                }
+                secondary={
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {subtitle}
+                  </Typography>
+                }
+              />
 
-        {payloadExists && (
-          <>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Payload</Typography>
-            <Box sx={{ bgcolor: "#fafafa", p: 1, borderRadius: 1, mb: 1 }}>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12 }}>{JSON.stringify(ticket.payload, null, 2)}</pre>
-            </Box>
-          </>
-        )}
+              <Box sx={{ ml: 1, textAlign: "right", display: "flex", flexDirection: "column", gap: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+                  {formatDateTime(ts)}
+                </Typography>
 
-        <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-          <Button size="small" onClick={onClose}>Close</Button>
-          <Button size="small" color="error" onClick={() => onCloseTicket(ticket)}>Close Ticket</Button>
-        </Box>
-      </CardContent>
-    </Card>
+                <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end" }}>
+                  <Tooltip title="Edit" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit && onEdit(t);
+                      }}
+                      aria-label={`edit-${t.id}`}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Close ticket" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClose && onClose(t);
+                      }}
+                      aria-label={`close-${t.id}`}
+                    >
+                      <DoneIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Open details" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect && onSelect(t);
+                      }}
+                      aria-label={`open-${t.id}`}
+                    >
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+            </ListItem>
+          );
+        })}
+      </List>
+    </Paper>
   );
 }
