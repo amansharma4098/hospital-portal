@@ -29,8 +29,13 @@ function formatDate(d) {
   }
 }
 
+function isOpenTicket(t) {
+  const raw = (t && (t.status || t.state || "")).toString().toLowerCase();
+  return raw !== "closed";
+}
+
 export default function OpenTicketsPanel({ logo, tickets = [], loading = false, onRefresh, onSelect, onEdit, onCopy }) {
-  const visible = Array.isArray(tickets) ? tickets.slice(0, 6) : [];
+  const visible = Array.isArray(tickets) ? tickets.filter(isOpenTicket).slice(0, 6) : [];
 
   return (
     <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 1 }}>
@@ -43,7 +48,7 @@ export default function OpenTicketsPanel({ logo, tickets = [], loading = false, 
             Open Tickets
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {loading ? "Refreshing…" : `${tickets?.length ?? 0} total`}
+            {loading ? "Refreshing…" : `${(tickets || []).filter(isOpenTicket).length} open`}
           </Typography>
         </Box>
 
@@ -61,7 +66,6 @@ export default function OpenTicketsPanel({ logo, tickets = [], loading = false, 
       {/* Body */}
       <Box>
         {loading ? (
-          // simple skeleton list while loading
           <List>
             {[1, 2, 3].map((i) => (
               <ListItem key={i} sx={{ py: 1 }}>
@@ -185,15 +189,12 @@ export default function OpenTicketsPanel({ logo, tickets = [], loading = false, 
       <Divider sx={{ mt: 1, mb: 1 }} />
       <Box sx={{ display: "flex", gap: 1, justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="caption" color="text.secondary">
-          Showing {visible.length} of {tickets?.length ?? 0}
+          Showing {visible.length} open
         </Typography>
 
         <Button
           size="small"
-          endIcon={<OpenInNewIcon />}
           onClick={() => {
-            // keep existing behavior: selecting nothing could be used to open a full list route
-            // we call onRefresh and rely on parent to navigate if needed
             if (onRefresh) onRefresh();
           }}
         >

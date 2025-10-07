@@ -49,10 +49,16 @@ function StatCard({ title, subtitle, value, icon, color, onClick }) {
         borderRadius: 3,
         overflow: "hidden",
         position: "relative",
+        boxShadow: 2,
         transition: "transform 0.25s ease, box-shadow 0.25s ease",
         "&:hover": {
           transform: "translateY(-6px)",
           boxShadow: 6,
+        },
+        // 🧹 Ensure no borders or extra lines appear
+        "& *": {
+          borderBottom: "none !important",
+          textDecoration: "none !important",
         },
       }}
     >
@@ -77,13 +83,37 @@ function StatCard({ title, subtitle, value, icon, color, onClick }) {
           }}
         >
           <Box>
-            <Typography variant="subtitle2" color="text.secondary">
+            <Typography
+              variant="subtitle2"
+              color="text.secondary"
+              sx={{ mb: 0, fontWeight: 600 }}
+            >
               {title}
             </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>
+
+            {/* Removed underline effect and ensured no hidden border */}
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                mt: 0.5,
+                mb: 0,
+                border: "none",
+                textDecoration: "none",
+              }}
+            >
               {value === "—" ? "—" : <AnimatedNumber value={value} />}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mt: 0.5,
+                border: "none",
+                textDecoration: "none",
+              }}
+            >
               {subtitle}
             </Typography>
           </Box>

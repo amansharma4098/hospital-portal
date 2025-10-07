@@ -16,7 +16,6 @@ import {
   Divider,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
-import DoneIcon from "@mui/icons-material/Done";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 function formatDateTime(d) {
@@ -28,7 +27,21 @@ function formatDateTime(d) {
   }
 }
 
-export default function RecentTicketsList({ tickets = [], loading = false, onEdit, onClose, onSelect }) {
+function isOpenTicket(t) {
+  const raw = (t && (t.status || t.state || "")).toString().toLowerCase();
+  // treat "closed" as closed; everything else (including empty) is open-ish
+  return raw !== "closed";
+}
+
+export default function RecentTicketsList({
+  tickets = [],
+  loading = false,
+  onEdit,
+  onSelect,
+}) {
+  // only show tickets that are not closed
+  const openTickets = Array.isArray(tickets) ? tickets.filter(isOpenTicket) : [];
+
   if (loading) {
     return (
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -54,10 +67,10 @@ export default function RecentTicketsList({ tickets = [], loading = false, onEdi
     );
   }
 
-  if (!tickets || tickets.length === 0) {
+  if (!openTickets.length) {
     return (
       <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-        <Typography color="text.secondary">No tickets yet</Typography>
+        <Typography color="text.secondary">No open tickets</Typography>
         <Button size="small" sx={{ mt: 1 }} onClick={() => onSelect && onSelect(null)}>
           Create first ticket
         </Button>
@@ -72,14 +85,14 @@ export default function RecentTicketsList({ tickets = [], loading = false, onEdi
           Recent Tickets
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          {tickets.length} total
+          {openTickets.length} open
         </Typography>
       </Box>
 
       <Divider />
 
       <List dense>
-        {tickets.map((t) => {
+        {openTickets.map((t) => {
           const title = `${t.type || t.request_type || "REQ"} — #${t.id}`;
           const parts = [];
           if (t.count) parts.push(`Count: ${t.count}`);
@@ -145,19 +158,6 @@ export default function RecentTicketsList({ tickets = [], loading = false, onEdi
                       aria-label={`edit-${t.id}`}
                     >
                       <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-
-                  <Tooltip title="Close ticket" arrow>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onClose && onClose(t);
-                      }}
-                      aria-label={`close-${t.id}`}
-                    >
-                      <DoneIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
 
