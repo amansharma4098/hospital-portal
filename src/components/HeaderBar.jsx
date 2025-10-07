@@ -1,126 +1,104 @@
 // src/components/HeaderBar.jsx
 import React from "react";
-import {
-  Avatar,
-  Box,
-  Button,
-  Stack,
-  Typography,
-  Tooltip,
-  IconButton,
-  useTheme,
-  useMediaQuery,
-} from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import SyncIcon from "@mui/icons-material/Sync";
-import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+import { Avatar, Box, Button, Stack, Typography, useTheme } from "@mui/material";
 
-export default function HeaderBar({
-  logo,
-  hospitalName,
-  hospitalEmail,
-  onRefreshCounts,
-  onRefreshTickets,
-}) {
+export default function HeaderBar({ logo, hospitalName, hospitalEmail, onRefreshCounts, onRefreshTickets }) {
   const theme = useTheme();
-  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
     <Box
+      mb={4}
       sx={{
-        mb: 3,
-        borderRadius: 3,
-        p: { xs: 2, md: 3 },
-        boxShadow: 1,
-        background: `linear-gradient(135deg, ${theme.palette.primary.light}10, ${theme.palette.background.paper})`,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: "box-shadow 0.2s ease-in-out",
-        "&:hover": { boxShadow: 4 },
+        borderRadius: 2,
+        p: 3,
+        background: `linear-gradient(90deg, ${theme.palette.primary.light}11, ${theme.palette.primary.main}05)`,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       }}
     >
       <Stack
-        direction={isSmall ? "column" : "row"}
-        alignItems={isSmall ? "flex-start" : "center"}
-        spacing={isSmall ? 2 : 3}
+        direction="row"
+        alignItems="center"
+        spacing={3}
+        sx={{
+          flexWrap: "wrap",
+        }}
       >
-        {/* Logo & identity */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Avatar
+        {/* ✅ Proper logo display */}
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "12px",
+            border: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.background.paper,
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            component="img"
             src={logo}
-            variant="rounded"
-            alt="Raksha logo"
+            alt="Raksha Logo"
             sx={{
-              width: 90,
-              height: 90,
-              boxShadow: 2,
-              border: `2px solid ${theme.palette.primary.main}`,
-              bgcolor: "background.paper",
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
             }}
           />
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              {hospitalName || "Hospital Portal"}
-            </Typography>
+        </Box>
+
+        {/* ✅ Hospital Info */}
+        <Box sx={{ minWidth: 220 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.text.primary,
+            }}
+          >
+            {hospitalName || "Hospital Portal"}
+          </Typography>
+
+          {hospitalEmail && (
             <Typography
               variant="body2"
               color="text.secondary"
               sx={{ mt: 0.5 }}
             >
-              {hospitalEmail || "admin@hospital.com"}
+              {hospitalEmail}
             </Typography>
-          </Box>
+          )}
+
+          <Box
+            sx={{
+              height: 2,
+              width: "100%",
+              mt: 1.5,
+              borderRadius: 1,
+              background:
+                "linear-gradient(90deg, #1976d2 0%, #42a5f5 50%, #90caf9 100%)",
+            }}
+          />
         </Box>
 
         <Box sx={{ flex: 1 }} />
 
-        {/* Action buttons */}
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <Tooltip title="Refresh dashboard counts">
-            <IconButton
-              color="primary"
-              onClick={onRefreshCounts}
-              sx={{
-                bgcolor: "background.paper",
-                border: `1px solid ${theme.palette.divider}`,
-                "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
-              }}
-            >
-              <SyncIcon />
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Refresh recent tickets">
-            <IconButton
-              color="primary"
-              onClick={onRefreshTickets}
-              sx={{
-                bgcolor: "background.paper",
-                border: `1px solid ${theme.palette.divider}`,
-                "&:hover": { bgcolor: "primary.main", color: "primary.contrastText" },
-              }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-
-          {/* Optional logout / profile button placeholder */}
-          {/* <Tooltip title="Logout">
-            <IconButton color="error">
-              <LogoutIcon />
-            </IconButton>
-          </Tooltip> */}
-        </Stack>
+        <Button variant="outlined" onClick={onRefreshCounts}>
+          Refresh Counts
+        </Button>
+        <Button
+          sx={{
+            ml: 1,
+            bgcolor: `${theme.palette.primary.main}10`,
+            "&:hover": { bgcolor: `${theme.palette.primary.main}20` },
+          }}
+          onClick={onRefreshTickets}
+        >
+          Refresh Tickets
+        </Button>
       </Stack>
-
-      {/* Bottom accent line */}
-      <Box
-        sx={{
-          mt: 2,
-          height: 3,
-          borderRadius: 3,
-          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-        }}
-      />
     </Box>
   );
 }
