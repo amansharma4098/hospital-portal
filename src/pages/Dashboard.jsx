@@ -174,9 +174,6 @@ export default function Dashboard() {
   return (
     <Box sx={{ py: 6, bgcolor: "background.default", minHeight: "100vh" }}>
       <Container maxWidth="lg">
-        <Paper sx={{ p: 3, borderRadius: 2, mb: 4, border: `1px solid #e0e0e0` }}>
-          <HeaderBar logo={logo} hospitalName={hospitalName} hospitalEmail={hospitalEmail} onRefreshCounts={fetchDashboardCounts} onRefreshTickets={fetchTickets} />
-        </Paper>
 
         <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
